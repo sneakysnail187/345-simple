@@ -60,23 +60,23 @@
       [(eq? 'var (operator lis)) (cons operand1 state)]
       [else 'nooperator])))
 
-(define getBinding
+(define getBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state) 'noSuchBinding]
+      [(null? state) 'noSuchBinding] ;; change to error later
       [(eq? x (car (car state))) (car state)]
       [else                       (getBinding x (cdr state))])))
 
-(define setBinding
+(define setBinding ;; takes a binding pair and a state
   (lambda (x state)
     (cond
-      [(null? state) 'noSuchBinding]
-      [(eq? x (cadr (car state))) (car state)]
-      [else                       (getBinding x (cdr state))])))
+      [(null? state)                                      '()]
+      [(and (list? (car state)) (eq? (getBinding (car x) state) 'noSuchBinding))    (error 'noSuchVariable)]
+      [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
+      [(eq? (car x) (car state))                          (cons (car state) (cons (cadr x) '())) ]
+      [else                                               (cons (car state) (setBinding x (cdr state)))])))
         
     
-
-
 
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 ; state
