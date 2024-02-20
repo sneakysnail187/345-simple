@@ -79,6 +79,17 @@
 
 
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
+; state
+
+(define M_state
+  (lambda (exp state)
+    (cond
+      [(null? exp) (car state)]
+      [(eq? (operator exp) 'var)
+       (M_state (cdr exp) (cons (cons (cadr exp) 0) state))]
+      [(eq? (operator exp) 'return)
+       (cons (M_integer (operand1 exp) state) state)]
+      [else (error "Unsupported operation" exp)])))
 
 
 
