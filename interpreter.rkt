@@ -5,7 +5,7 @@
 (define operand1 cadr)
 (define operand2 caddr)
 (define operand3 cadddr)
-(define bComparator (cons car (cons cadr '())))
+(define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
 
 ;; Operations on 2 integers
 (define M_integer
@@ -44,7 +44,25 @@
       [(eq? '>     (operator lis))    (> (M_comparison(operand2 lis)) (M_comparison(operand3 lis)))]
       [else 'nooperator])))
 
+;; TODO statements
 
+(define M_assign
+  (lambda (lis)
+    (cond
+      [(null? lis) '()]
+      [(eq? '= (operator lis)) (cons operand1 operand2)]
+      [else 'nooperator])))
+
+(define M_declare
+  (lambda (lis)
+    (cond
+      [(null? lis) '()]
+      [(eq? '= (operator lis)) (cons operand1 operand2)]
+      [else 'nooperator])))
+
+
+
+;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 
 
 
