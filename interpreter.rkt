@@ -54,11 +54,20 @@
       [else 'nooperator])))
 
 (define M_declare
-  (lambda (lis)
+  (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(eq? '= (operator lis)) (cons operand1 operand2)]
+      [(eq? 'var (operator lis)) (cons operand1 state)]
       [else 'nooperator])))
+
+(define getBinding
+  (lambda (x state)
+    (cond
+      [(null? state) 'noSuchBinding]
+      [(eq? x (cadr (car state))) (car state)]
+      [else                       (getBinding x (cdr state))])))
+        
+    
 
 
 
