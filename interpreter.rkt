@@ -64,6 +64,13 @@
   (lambda (x state)
     (cond
       [(null? state) 'noSuchBinding]
+      [(eq? x (car (car state))) (car state)]
+      [else                       (getBinding x (cdr state))])))
+
+(define setBinding
+  (lambda (x state)
+    (cond
+      [(null? state) 'noSuchBinding]
       [(eq? x (cadr (car state))) (car state)]
       [else                       (getBinding x (cdr state))])))
         
