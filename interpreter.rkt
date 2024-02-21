@@ -6,6 +6,7 @@
 (define operand2 caddr)
 (define operand3 cadddr)
 (define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
+
 (define isVar
   (lambda (x)
     (cond
@@ -90,11 +91,6 @@
         (M_while lis (M_state (operand2 lis) state))
         state)))
 
-;; Return operation
-(define M_return
-  (lambda (lis state)
-    (cons (M_integer (operand1 lis state) state) state)))
-
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
@@ -134,7 +130,16 @@
       [(eq? (operator exp) 'return) (M_return exp state)]
       [else (error "Unsupported operation" exp)])))
 
-
+;; Return operation
+(define M_value
+  (lambda (exp state)
+    (cond
+      [(null? exp) (error "Empty return expression")]
+      [(eq? (operator exp) 'return)
+       (if (boolean? (operand1 exp))
+           (cons (M_boolean (operand1 exp) state) state) ; Boolean return value
+           (cons (M_integer (operand1 exp) state) state))] ; Integer return value
+      [else (error "Invalid return expression" exp)])))
 
 (define program (lambda (file) (parser file)))
 
