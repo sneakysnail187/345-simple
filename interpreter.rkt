@@ -43,9 +43,6 @@
       [(eq? '!     (operator lis))    (not(M_boolean (operand1 lis))) ]
       [else 'nooperator])))
 
-;(define M_value
-;  (lambda (lis)))
-
 ;; Comparison ops
 
 (define M_comparison
@@ -62,18 +59,21 @@
 
 ;; TODO statements - currently tentative i think M_value is needed to do these properly
 
+;; Assign operation
 (define M_assign
   (lambda (lis state)
     (if (eq? '= (operator lis))
        (setBinding (cons operand1 (cons operand2 '())) state)
        'nooperator)))
 
+;; Declare operation
 (define M_declare
   (lambda (lis state)
     (if (eq? 'var (operator lis))
       (cons (cons operand1 '()) state)
       'nooperator)))
 
+;; If operation
 (define M_if
   (lambda (lis state)
     (cond
@@ -81,16 +81,17 @@
       [(eq? operand3 'else) (cdr operand3)]
       [else 'nooperator])))
 
+;; While operation
 (define M_while
   (lambda (lis state)
-    (cond
-      [(operand1) operand2] ;;need to evaluate repeatedly not sure how
-      [else 'nooperator])))
+    (if (M_boolean (operand1 lis state) state)
+        (M_while lis (M_state (operand2 lis) state))
+        state)))
 
-
-
-
-
+;; Return operation
+(define M_return
+  (lambda (lis state)
+    (cons (M_integer (operand1 lis state) state) state)))
 
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
@@ -117,10 +118,11 @@
   (lambda (exp state)
     (cond
       [(null? exp) (car state)]
-      [(eq? (operator exp) 'var)
-       (M_state (cdr exp) (cons (cons (cadr exp) 0) state))]
-      [(eq? (operator exp) 'return)
-       (cons (M_integer (operand1 exp) state) state)]
+      [(eq? (operator exp) 'var) (M_declare exp state)]
+      [(eq? (operator exp) '=) (M_assign exp state)]
+      [(eq? (operator exp) 'if) (M_if exp state)]
+      [(eq? (operator exp) 'while) (M_while exp state)]
+      [(eq? (operator exp) 'return) (M_return exp state)]
       [else (error "Unsupported operation" exp)])))
 
 
