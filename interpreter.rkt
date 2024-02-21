@@ -127,7 +127,7 @@
       [(eq? (operator exp) '=) (M_assign exp state)]
       [(eq? (operator exp) 'if) (M_if exp state)]
       [(eq? (operator exp) 'while) (M_while exp state)]
-      [(eq? (operator exp) 'return) (M_return exp state)]
+      [(eq? (operator exp) 'return) (M_value exp state)]
       [else (error "Unsupported operation" exp)])))
 
 ;; Return operation
