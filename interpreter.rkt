@@ -66,7 +66,7 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(eq? 'var (operator lis)) (cons (operand1 lis) state)]
+      [(eq? 'var (operator lis)) (addBinding (operand1 lis) state)]
       [else (error "Unsupported operation" lis)])))
 
 ;; Assign operation
@@ -74,7 +74,7 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (M_integer (operand2 lis) state)) state)]
+      [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (M_value (operand2 lis) state)) state)]
       [else (error "Unsupported operation" lis)])))
 
 ;; If operation
@@ -127,19 +127,19 @@
       [(eq? (operator exp) '=) (M_assign exp state)]
       [(eq? (operator exp) 'if) (M_if exp state)]
       [(eq? (operator exp) 'while) (M_while exp state)]
-      [(eq? (operator exp) 'return) (M_return exp state)]
+      [(eq? (operator exp) 'return) (M_value exp state)]
       [else (error "Unsupported operation" exp)])))
 
 ;; Return operation
 (define M_value
   (lambda (exp state)
     (cond
-      [(null? exp) (error "Empty return expression")]
-      [(eq? (operator exp) 'return)
-       (if (boolean? (operand1 exp))
-           (cons (M_boolean (operand1 exp) state) state) ; Boolean return value
-           (cons (M_integer (operand1 exp) state) state))] ; Integer return value
-      [else (error "Invalid return expression" exp)])))
+      [(null? exp) (error "Empty expression")]
+      [(number? exp) exp]
+      [(or (eq? exp 'true)  (eq? exp 'false)) exp]
+      [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
+      [(number? (operand1 exp)) (M_integer (operand1 exp) state)]
+      [else (error "Invalid expression" exp)])))
 
 (define program (lambda (file) (parser file)))
 
