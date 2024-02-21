@@ -59,27 +59,28 @@
 
 ;; TODO statements - currently tentative i think M_value is needed to do these properly
 
-;; Assign operation
-(define M_assign
-  (lambda (lis state)
-    (if (eq? '= (operator lis))
-       (setBinding (cons operand1 (cons operand2 '())) state)
-       'nooperator)))
-
 ;; Declare operation
 (define M_declare
   (lambda (lis state)
-    (if (eq? 'var (operator lis))
-      (cons (cons operand1 '()) state)
-      'nooperator)))
+    (cond
+      [(null? lis) '()]
+      [(eq? 'var (operator lis)) (cons (operand1 lis) state)]
+      [else (error "Unsupported operation" lis)])))
+
+;; Assign operation
+(define M_assign
+  (lambda (lis state)
+    (cond
+      [(null? lis) '()]
+      [(eq? '= (operator lis)) (cons (operand1 lis) (M_integer (operand2 lis state) state))]
+      [else (error "Unsupported operation" lis)])))
 
 ;; If operation
 (define M_if
   (lambda (lis state)
-    (cond
-      [(operand1) operand2] 
-      [(eq? operand3 'else) (cdr operand3)]
-      [else 'nooperator])))
+    (if (M_boolean (operand1 lis state) state)
+        (M_state (operand2 lis) state)
+        (M_state (operand3 lis) state))))
 
 ;; While operation
 (define M_while
