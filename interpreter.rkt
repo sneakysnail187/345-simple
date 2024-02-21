@@ -37,7 +37,8 @@
 (define M_boolean
   (lambda (lis)
     (cond
-      [(boolean? lis) lis]
+      [(and (boolean? lis) (false? lis)) 'false]
+      [(boolean? lis) 'true]
       [(eq? '(| |) (bComparator lis)) (or (M_boolean (operand2 lis)) (M_boolean (operand3 lis)))]
       [(eq? '(& &) (bComparator lis)) (and (M_boolean (operand2 lis)) (M_boolean (operand3 lis)))]
       [(eq? '!     (operator lis))    (not(M_boolean (operand1 lis))) ]
@@ -57,7 +58,7 @@
       [(eq? '>     (operator lis))    (> (M_comparison(operand2 lis)) (M_comparison(operand3 lis)))]
       [else 'nooperator])))
 
-;; TODO statements - currently tentative i think M_value is needed to do these properly
+;; TODO statements - currently tentative
 
 ;; Declare operation
 (define M_declare
@@ -72,7 +73,7 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(eq? '= (operator lis)) (cons (operand1 lis) (M_integer (operand2 lis state) state))]
+      [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (M_integer (operand2 lis) state)) state)]
       [else (error "Unsupported operation" lis)])))
 
 ;; If operation
@@ -97,9 +98,9 @@
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state) (error 'noSuchBinding x)] ;; change to error later
+      [(null? state)             (error 'noSuchBinding x)] 
       [(eq? x (car (car state))) (car state)]
-      [else                       (getBinding x (cdr state))])))
+      [else                      (getBinding x (cdr state))])))
 
 (define setBinding ;; takes a binding pair and a state
   (lambda (x state)
@@ -109,6 +110,13 @@
       [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
       [(eq? (car x) (car state))                          (cons (car state) (cons (cadr x) '())) ]
       [else                                               (cons (car state) (setBinding x (cdr state)))])))
+
+(define addBinding ;; takes a variable name and a state
+  (lambda (x state)
+    (cond
+      [(null? state) (cons x '())]
+      [(not(null?(getBinding x state))) (error 'redefinedVariable x)]
+      [else (cons x state)])))
         
     
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
