@@ -6,6 +6,7 @@
 (define operand2 caddr)
 (define operand3 cadddr)
 (define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
+
 (define isVar
   (lambda (x)
     (cond
@@ -91,8 +92,14 @@
 
 ;; Return operation
 (define M_return
-  (lambda (lis state)
-    (cons (M_integer (operand1 lis state) state) state)))
+  (lambda (exp state)
+    (cond
+      [(null? exp) (error "Empty return expression")]
+      [(eq? (operator exp) 'return)
+       (if (boolean? (operand1 exp))
+           (cons (M_boolean (operand1 exp) state) state) ; Boolean return value
+           (cons (M_integer (operand1 exp) state) state))] ; Integer return value
+      [else (error "Invalid return expression" exp)])))
 
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
