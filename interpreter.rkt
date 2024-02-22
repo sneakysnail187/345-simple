@@ -133,6 +133,7 @@
       [else (error "Unsupported operation" exp)])))
 
 ;; Value operation
+;; Value operation
 (define M_value
   (lambda (exp state)
     (cond
@@ -141,6 +142,7 @@
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer (operand1 exp) state)]
+      [(list? (operand1 exp)) (M_value (operand1 exp) state)]
       [else (error "Invalid expression" exp)])))
 
 
