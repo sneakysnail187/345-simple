@@ -139,7 +139,7 @@
     (cond
       [(null? exp) (error "Empty expression")]
       [(number? exp) exp]
-      [(symbol? exp) (getBinding exp state)]
+      [(symbol? exp) (cadr(getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
@@ -170,7 +170,6 @@
        (M_while (car parse) state)
        (evaluate (cdr parse) break state)]
       [(eq? (operator (car parse)) '=)
-       (M_assign (car parse) state)
-       (evaluate (cdr parse) break state)]
+       (evaluate (cdr parse) break (M_state (car parse) state))]
       [else (error "Unsupported operation or invalid syntax")])))
 
