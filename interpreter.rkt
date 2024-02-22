@@ -26,11 +26,11 @@
     (cond
       [(number? lis) lis]
       [(isVar lis)   (cdr (getBinding lis state))]
-      [(eq? '+ (operator lis)) (+ (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
-      [(eq? '- (operator lis)) (- (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
       [(eq? '/ (operator lis)) (quotient (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
       [(eq? '* (operator lis)) (* (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
       [(eq? '% (operator lis)) (remainder (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '+ (operator lis)) (+ (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '- (operator lis)) (- (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
       [else 'nooperator])))
 
 
@@ -141,30 +141,35 @@
       [(number? exp) exp]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
-      [(number? (operand1 exp)) (M_integer (operand1 exp) state)]
-      [(list? (operand1 exp)) (M_value (operand1 exp) state)] ; Adjusted handling of list operands
+      [(number? (operand1 exp)) (M_integer exp state)]
+      [(list? (operand1 exp)) (M_value (cons (operator exp) (cons (M_value (operand1 exp) state) (cons (operand2 exp) '()))) state)]
       [else (error "Invalid expression" exp)])))
-
 
 
 (define program (lambda (file) (parser file)))
 
+
 (define interpret
   (lambda (filename)
+    (if (null? (parser filename))
+        (error "Empty program")
+        (call/cc (lambda (k) (evaluate (parser filename) k))))))
+
+      
+
+(define evaluate
+  (lambda (parse break)
     (cond
-      [(null? (parser filename)) (error "Empty program")] ; Error handling for empty program
-      [(eq? (operator (car (parser filename))) 'var)
-       (M_declare (car (parser filename)) '())] ; Declare the variables and update the state
-      [(eq? (operator (car (parser filename))) 'return)
-       (M_value (car (parser filename)) '())] ; Handle return statement
-      [(eq? (operator (car (parser filename))) 'if)
-       (M_if (car (parser filename)) '())] ; Handle if statement
-      [(eq? (operator (car (parser filename))) 'while)
-       (M_while (car (parser filename)) '())] ; Handle while loop
-      [else (error "Unsupported operation or invalid syntax")]))) ; Handle other cases
-
-
-
-
-
+      [(eq? (operator (car parse)) 'var)
+       (M_declare (car parse) '())
+       (evaluate (cdr parse) break)]
+      [(eq? (operator (car parse)) 'return)
+       (break (M_value (cadr(car parse)) '()))]
+      [(eq? (operator (car parse)) 'if)
+       (M_if (car parse) '())
+       (evaluate (cdr parse) break)]
+      [(eq? (operator (car parse)) 'while)
+       (M_while (car parse) '())
+       (evaluate (cdr parse) break)]
+      [else (error "Unsupported operation or invalid syntax")])))
 
