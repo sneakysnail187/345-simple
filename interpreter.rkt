@@ -148,8 +148,18 @@
 (define interpret
   (lambda (filename)
     (cond
-      [(eq? (operator (car program)) 'var)]
-      [else 'lol])))
+      [(null? (parser filename)) (error "Empty program")] ; Error handling for empty program
+      [(eq? (operator (car (parser filename))) 'var)
+       (M_declare (car (parser filename)) '())] ; Declare the variables and update the state
+      [(eq? (operator (car (parser filename))) 'return)
+       (M_value (car (parser filename)) '())] ; Handle return statement
+      [(eq? (operator (car (parser filename))) 'if)
+       (M_if (car (parser filename)) '())] ; Handle if statement
+      [(eq? (operator (car (parser filename))) 'while)
+       (M_while (car (parser filename)) '())] ; Handle while loop
+      [else (error "Unsupported operation or invalid syntax")]))) ; Handle other cases
+
+
 
 
 
