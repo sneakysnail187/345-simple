@@ -132,7 +132,7 @@
       [(eq? (operator exp) 'return) (M_value exp state)]
       [else (error "Unsupported operation" exp)])))
 
-;; Return operation
+;; Value operation
 (define M_value
   (lambda (exp state)
     (cond
