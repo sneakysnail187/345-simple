@@ -76,7 +76,7 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (M_value (operand2 lis) state)) state)]
+      [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (cons (M_value (operand2 lis) state) '())) state)]
       [else (error "Unsupported operation" lis)])))
 
 ;; If operation
@@ -153,23 +153,24 @@
   (lambda (filename)
     (if (null? (parser filename))
         (error "Empty program")
-        (call/cc (lambda (k) (evaluate (parser filename) k))))))
-
-      
+        (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
 
 (define evaluate
-  (lambda (parse break)
+  (lambda (parse break state)
     (cond
       [(eq? (operator (car parse)) 'var)
-       (M_declare (car parse) '())
-       (evaluate (cdr parse) break)]
+       (M_declare (car parse) state)
+       (evaluate (cdr parse) break state)]
       [(eq? (operator (car parse)) 'return)
-       (break (M_value (cadr(car parse)) '()))]
+       (break (M_value (cadr(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
-       (M_if (car parse) '())
-       (evaluate (cdr parse) break)]
+       (M_if (car parse) state)
+       (evaluate (cdr parse) break state)]
       [(eq? (operator (car parse)) 'while)
-       (M_while (car parse) '())
-       (evaluate (cdr parse) break)]
+       (M_while (car parse) state)
+       (evaluate (cdr parse) break state)]
+      [(eq? (operator (car parse)) '=)
+       (M_assign (car parse) state)
+       (evaluate (cdr parse) break state)]
       [else (error "Unsupported operation or invalid syntax")])))
 
