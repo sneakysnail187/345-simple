@@ -1,12 +1,14 @@
 #lang racket
 (require "simpleParser.rkt")
 
+; defines quick operators
 (define operator (lambda (exp) (car exp)))
 (define operand1 cadr)
 (define operand2 caddr)
 (define operand3 cadddr)
 (define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
 
+; defines what a variable is
 (define isVar
   (lambda (x)
     (cond
@@ -119,8 +121,7 @@
     
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 
-; state
-
+; state function
 (define M_state
   (lambda (exp state)
     (cond
@@ -133,7 +134,6 @@
       [else (error "Unsupported operation" exp)])))
 
 ;; Value operation
-;; Value operation
 (define M_value
   (lambda (exp state)
     (cond
@@ -145,10 +145,10 @@
       [(list? (operand1 exp)) (M_value (cons (operator exp) (cons (M_value (operand1 exp) state) (cons (operand2 exp) '()))) state)]
       [else (error "Invalid expression" exp)])))
 
-
+; defines a file as a program
 (define program (lambda (file) (parser file)))
 
-
+; inteprets a file
 (define interpret
   (lambda (filename)
     (if (null? (parser filename))
