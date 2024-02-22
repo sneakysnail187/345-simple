@@ -36,28 +36,29 @@
 
 ;; Operations on 1-2 booleans
 (define M_boolean
-  (lambda (lis)
+  (lambda (lis state)
     (cond
       [(and (boolean? lis) (false? lis)) 'false]
       [(boolean? lis) 'true]
-      [(eq? '(| |) (bComparator lis)) (or (M_boolean (operand2 lis)) (M_boolean (operand3 lis)))]
-      [(eq? '(& &) (bComparator lis)) (and (M_boolean (operand2 lis)) (M_boolean (operand3 lis)))]
-      [(eq? '!     (operator lis))    (not(M_boolean (operand1 lis))) ]
+      [(eq? '(| |) (bComparator lis)) (or (M_boolean (operand2 lis) state) (M_boolean (operand3 lis) state))]
+      [(eq? '(& &) (bComparator lis)) (and (M_boolean (operand2 lis) state) (M_boolean (operand3 lis) state))]
+      [(eq? '! (operator lis)) (not (M_boolean (operand1 lis) state))]
       [else 'nooperator])))
 
 ;; Comparison ops
-
 (define M_comparison
-  (lambda (lis)
+  (lambda (lis state)
     (cond
       [(number? lis) lis]
-      [(eq? '(= =) (bComparator lis)) (eq? (M_comparison(operand2 lis)) (M_comparison(operand3 lis))) ]
-      [(eq? '(! =) (bComparator lis)) (not(eq? (M_comparison(operand2 lis)) (M_comparison(operand3 lis)))) ]
-      [(eq? '(< =) (bComparator lis)) (<= (M_comparison(operand2 lis)) (M_comparison(operand3 lis))) ]
-      [(eq? '(> =) (bComparator lis)) (>= (M_comparison(operand2 lis)) (M_comparison(operand3 lis))) ]
-      [(eq? '<     (operator lis))    (< (M_comparison(operand2 lis)) (M_comparison(operand3 lis)))]
-      [(eq? '>     (operator lis))    (> (M_comparison(operand2 lis)) (M_comparison(operand3 lis)))]
+      [(eq? '(= =) (bComparator lis)) (eq? (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
+      [(eq? '(! =) (bComparator lis)) (not (eq? (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state)))]
+      [(eq? '(< =) (bComparator lis)) (<= (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
+      [(eq? '(> =) (bComparator lis)) (>= (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
+      [(eq? '< (operator lis)) (< (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
+      [(eq? '> (operator lis)) (> (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
       [else 'nooperator])))
+
+
 
 ;; TODO statements - currently tentative
 
@@ -140,6 +141,7 @@
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer (operand1 exp) state)]
       [else (error "Invalid expression" exp)])))
+
 
 (define program (lambda (file) (parser file)))
 
