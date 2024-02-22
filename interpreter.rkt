@@ -66,6 +66,7 @@
 ;; TODO statements - currently tentative
 
 ;; Declare operation
+
 (define M_declare
   (lambda (lis state)
     (cond
@@ -114,10 +115,9 @@
 (define addBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state) (cons x '())]
+      [(null? state) (cons(cons x '()) '())]
       [(not(null?(getBinding x state))) (error 'redefinedVariable x)]
       [else (cons x state)])))
-        
     
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 
@@ -139,6 +139,7 @@
     (cond
       [(null? exp) (error "Empty expression")]
       [(number? exp) exp]
+      [(symbol? exp) (getBinding exp state)]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
@@ -159,8 +160,7 @@
   (lambda (parse break state)
     (cond
       [(eq? (operator (car parse)) 'var)
-       (M_declare (car parse) state)
-       (evaluate (cdr parse) break state)]
+       (evaluate (cdr parse) break (M_state (car parse) state))]
       [(eq? (operator (car parse)) 'return)
        (break (M_value (cadr(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
