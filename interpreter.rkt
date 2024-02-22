@@ -26,12 +26,13 @@
     (cond
       [(number? lis) lis]
       [(isVar lis)   (cdr (getBinding lis state))]
-      [(eq? '+ (operator lis)) (+ (M_integer(operand1 lis)) (M_integer(operand2 lis)))]
-      [(eq? '- (operator lis)) (- (M_integer(operand1 lis)) (M_integer(operand2 lis)))]
-      [(eq? '/ (operator lis)) (quotient (M_integer(operand1 lis)) (M_integer(operand2 lis)))]
-      [(eq? '* (operator lis)) (* (M_integer(operand1 lis)) (M_integer(operand2 lis)))]
-      [(eq? '% (operator lis)) (remainder (M_integer(operand1 lis)) (M_integer(operand2 lis)))]
+      [(eq? '+ (operator lis)) (+ (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '- (operator lis)) (- (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '/ (operator lis)) (quotient (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '* (operator lis)) (* (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '% (operator lis)) (remainder (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
       [else 'nooperator])))
+
 
 
 ;; Operations on 1-2 booleans
