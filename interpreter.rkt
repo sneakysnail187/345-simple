@@ -20,6 +20,12 @@
       [(eq? '% x) #f]
       [(list?  x) #f]
       [else       #t])))
+; returns the length of a list
+(define mylength
+  (lambda (lis)
+    (if (null? lis)
+        0
+        (+ 1 (mylength (cdr lis))))))
   
 
 ;; Operations on 2 integers
@@ -67,7 +73,7 @@
 
 ;; Declare operation
 
-(define M_declare
+(define M_declare   ;if there is a sublist in the list containing var set the value of the declared variable
   (lambda (lis state)
     (cond
       [(null? lis) '()]
@@ -80,6 +86,7 @@
     (cond
       [(null? lis) '()]
       [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (cons (M_value (operand2 lis) state) '())) state)]
+      [(isVar (operator lis))  (setBinding (cons (operator lis) (cons (M_value (operand1 lis) state) '())) state)]
       [else (error "Unsupported operation" lis)])))
 
 ;; If operation
@@ -126,6 +133,9 @@
   (lambda (exp state)
     (cond
       [(null? exp) (car state)]
+      [(and (> (mylength exp) 2) (eq? (operator exp) 'var))
+       (M_assign (cdr exp) (M_declare exp state))]
+      
       [(eq? (operator exp) 'var) (M_declare exp state)]
       [(eq? (operator exp) '=) (M_assign exp state)]
       [(eq? (operator exp) 'if) (M_if exp state)]
@@ -152,6 +162,9 @@
 ; inteprets a file
 (define interpret
   (lambda (filename)
+    (begin
+         (display "Full parse")
+         (display (parser filename)))
     (if (null? (parser filename))
         (error "Empty program")
         (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
