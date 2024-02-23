@@ -149,7 +149,7 @@
     (cond
       [(null? exp) (error "Empty expression")]
       [(number? exp) exp]
-      [(symbol? exp) (cadr(getBinding exp state))]
+      [(symbol? exp) (operand1(getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
