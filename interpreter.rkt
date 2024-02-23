@@ -3,7 +3,7 @@
 
 ; defines quick operators
 (define operator (lambda (exp) (car exp)))
-(define operand1 cadr)
+(define operand1 (lambda (exp) (cadr exp)))
 (define operand2 caddr)
 (define operand3 cadddr)
 (define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
@@ -106,10 +106,12 @@
 
 ;; If operation
 (define M_if
-  (lambda (lis state)
-    (if (M_boolean (operand1 lis state) state)
+  (lambda (lis break state)
+    (if (M_boolean (operand1 lis) state)
         (M_state (operand2 lis) state)
         (M_state (operand3 lis) state))))
+
+;(evaluate (cdr parse) break (M_state (car parse) state))]
 
 ;; While operation
 (define M_while
@@ -129,7 +131,7 @@
   (lambda (x state)
     (cond
       [(null? state)                                      '()]
-      [(eq? (car x) (car state))                          (cons (car state) (cons (cadr x) '())) ]
+      [(eq? (car x) (car state))                          (display (cons (car state) (cons (cadr x) '()))) (cons (car state) (cons (cadr x) '())) ]
       [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
       [else                                               (cons (car state) (setBinding x (cdr state)))])))
 
@@ -149,10 +151,9 @@
       [(null? exp) (car state)]
       [(and (> (mylength exp) 2) (eq? (operator exp) 'var))
        (M_assign (cdr exp) (M_declare exp state))]
-      
       [(eq? (operator exp) 'var) (M_declare exp state)]
       [(eq? (operator exp) '=) (M_assign exp state)]
-      [(eq? (operator exp) 'if) (M_if exp state)]
+      [(eq? (operator exp) 'if) (M_if exp break state)]
       [(eq? (operator exp) 'while) (M_while exp state)]
       [(eq? (operator exp) 'return) (M_value exp state)]
       [else (error "Unsupported operation" exp)])))
@@ -167,7 +168,7 @@
                 (M_integer exp state)
                 (M_boolean exp state))]
       [(number? exp) exp]
-      [(symbol? exp) (cadr(getBinding exp state))]
+      [(isVar exp) (operand1 (getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
@@ -182,7 +183,8 @@
   (lambda (filename)
     (begin
          (display "Full parse")
-         (display (parser filename)))
+         (display (parser filename))
+         (newline))
     (if (null? (parser filename))
         (error "Empty program")
         (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
@@ -190,13 +192,15 @@
 (define evaluate
   (lambda (parse break state)
     (cond
+     ; [(eq? (operator parse) '=)
+     ;  (M_state (car parse) state)]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) break (M_state (car parse) state))]
       [(eq? (operator (car parse)) 'return)
        (break (M_value (cadr(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
-       (M_if (car parse) state)
-       (evaluate (cdr parse) break state)]
+       (M_if (car parse) break state)
+       (evaluate (cdr parse) break (M_state (car parse) state))]
       [(eq? (operator (car parse)) 'while)
        (M_while (car parse) state)
        (evaluate (cdr parse) break state)]
