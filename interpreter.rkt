@@ -18,8 +18,21 @@
       [(eq? '/ x) #f]
       [(eq? '* x) #f]
       [(eq? '% x) #f]
+      [(eq? '= x) #f]
       [(list?  x) #f]
       [else       #t])))
+
+; defines what an integer operator is is
+(define isIntOp
+  (lambda (x)
+    (cond
+      [(eq? '+ x) #t]
+      [(eq? '- x) #t]
+      [(eq? '/ x) #t]
+      [(eq? '* x) #t]
+      [(eq? '% x) #t]
+      [else       #f])))
+
 ; returns the length of a list
 (define mylength
   (lambda (lis)
@@ -34,11 +47,11 @@
     (cond
       [(number? lis) lis]
       [(isVar lis)   (cdr (getBinding lis state))]
-      [(eq? '/ (operator lis)) (quotient (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
-      [(eq? '* (operator lis)) (* (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
-      [(eq? '% (operator lis)) (remainder (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
-      [(eq? '+ (operator lis)) (+ (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
-      [(eq? '- (operator lis)) (- (M_integer (operand1 lis) state) (M_integer (operand2 lis) state))]
+      [(eq? '/ (operator lis)) (quotient (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '* (operator lis)) (* (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '% (operator lis)) (remainder (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '+ (operator lis)) (+ (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '- (operator lis)) (- (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [else 'nooperator])))
 
 
@@ -49,9 +62,9 @@
     (cond
       [(and (boolean? lis) (false? lis)) 'false]
       [(boolean? lis) 'true]
-      [(eq? '(| |) (bComparator lis)) (or (M_boolean (operand2 lis) state) (M_boolean (operand3 lis) state))]
-      [(eq? '(& &) (bComparator lis)) (and (M_boolean (operand2 lis) state) (M_boolean (operand3 lis) state))]
-      [(eq? '! (operator lis)) (not (M_boolean (operand1 lis) state))]
+      [(eq? '(| |) (bComparator lis)) (or (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '(& &) (bComparator lis)) (and (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '! (operator lis)) (not (M_value (operand1 lis) state))]
       [else 'nooperator])))
 
 ;; Comparison ops
@@ -59,12 +72,12 @@
   (lambda (lis state)
     (cond
       [(number? lis) lis]
-      [(eq? '(= =) (bComparator lis)) (eq? (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
-      [(eq? '(! =) (bComparator lis)) (not (eq? (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state)))]
-      [(eq? '(< =) (bComparator lis)) (<= (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
-      [(eq? '(> =) (bComparator lis)) (>= (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
-      [(eq? '< (operator lis)) (< (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
-      [(eq? '> (operator lis)) (> (M_comparison (operand2 lis) state) (M_comparison (operand3 lis) state))]
+      [(eq? '(= =) (bComparator lis)) (eq? (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '(! =) (bComparator lis)) (not (eq? (M_value (operand2 lis) state) (M_value (operand3 lis) state)))]
+      [(eq? '(< =) (bComparator lis)) (<= (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '(> =) (bComparator lis)) (>= (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '< (operator lis)) (< (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '> (operator lis)) (> (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
       [else 'nooperator])))
 
 
@@ -85,6 +98,8 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
+      [(and (isVar (operator lis)) (eq? (getBinding (operator lis) state) 'noSuchBinding))    (error 'noSuchVariable)]
+      [(and (eq? '= (operator lis)) (eq? (getBinding (operand1 lis) state) 'noSuchBinding))    (error 'noSuchVariable)]
       [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (cons (M_value (operand2 lis) state) '())) state)]
       [(isVar (operator lis))  (setBinding (cons (operator lis) (cons (M_value (operand1 lis) state) '())) state)]
       [else (error "Unsupported operation" lis)])))
@@ -106,7 +121,7 @@
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state)             (error 'noSuchBinding x)] 
+      [(null? state)             'noSuchBinding] 
       [(eq? x (car (car state))) (car state)]
       [else                      (getBinding x (cdr state))])))
 
@@ -114,17 +129,16 @@
   (lambda (x state)
     (cond
       [(null? state)                                      '()]
-      [(and (list? (car state)) (eq? (getBinding (car x) state) 'noSuchBinding))    (error 'noSuchVariable (car x))]
-      [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
       [(eq? (car x) (car state))                          (cons (car state) (cons (cadr x) '())) ]
+      [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
       [else                                               (cons (car state) (setBinding x (cdr state)))])))
 
 (define addBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
       [(null? state) (cons(cons x '()) '())]
-      [(not(null?(getBinding x state))) (error 'redefinedVariable x)]
-      [else (cons x state)])))
+      [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable x)] 
+      [else (cons (cons x '()) state)])))
     
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 
@@ -148,8 +162,12 @@
   (lambda (exp state)
     (cond
       [(null? exp) (error "Empty expression")]
+      [(list? exp)
+           (if (isIntOp (operator exp))
+                (M_integer exp state)
+                (M_boolean exp state))]
       [(number? exp) exp]
-      [(symbol? exp) (operand1(getBinding exp state))]
+      [(symbol? exp) (cadr(getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
