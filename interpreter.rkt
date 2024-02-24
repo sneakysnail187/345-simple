@@ -59,6 +59,7 @@
     (cond
       [(number? lis) lis]
       [(isVar lis)   (cdr (getBinding lis state))]
+      [(and (eq? '- (operator lis)) (list? (operand1 lis))) (- (M_value (operand1 lis) state))]
       [(eq? '/ (operator lis)) (quotient (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '* (operator lis)) (* (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '% (operator lis)) (remainder (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
@@ -104,18 +105,19 @@
     (cond
       [(null? lis) '()]
       [(eq? 'var (operator lis)) (addBinding (operand1 lis) state)]
-      [else (error "Unsupported operation" lis)])))
+      [else (error "Unsupported operation" (symbol->string (operator lis)))])))
 
 ;; Assign operation
 (define M_assign
   (lambda (lis state)
     (cond
       [(null? lis) '()]
+      [(and (eq? '= (operator lis))(eq? (M_value (operand2 lis) state) 'noSuchBinding)) (error 'noSuchVariable (operand2 lis))]
       [(and (isVar (operator lis)) (eq? (getBinding (operator lis) state) 'noSuchBinding))    (error 'noSuchVariable)]
       [(and (eq? '= (operator lis)) (eq? (getBinding (operand1 lis) state) 'noSuchBinding))    (error 'noSuchVariable)]
       [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (cons (M_value (operand2 lis) state) '())) state)]
       [(isVar (operator lis))  (setBinding (cons (operator lis) (cons (M_value (operand1 lis) state) '())) state)]
-      [else (error "Unsupported operation" lis)])))
+      [else (error "Unsupported operation" (symbol->string (operator lis)))])))
 
 ;; If operation
 (define M_if
@@ -158,7 +160,7 @@
   (lambda (x state)
     (cond
       [(null? state) (cons(cons x '()) '())]
-      [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable x)] 
+      [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable (symbol->string x))] 
       [else (cons (cons x '()) state)])))
     
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
@@ -175,7 +177,7 @@
       [(eq? (operator exp) 'if) (M_if exp break state)]
       [(eq? (operator exp) 'while) (M_while exp break state)]
       [(eq? (operator exp) 'return) (break(M_value exp state))]
-      [else (error "Unsupported operation" exp)])))
+      [else (error "Unsupported operation" (symbol->string exp))])))
 
 ;; Value operation
 (define M_value
@@ -188,12 +190,15 @@
                 (M_boolean exp state))]
       [(number? exp) exp]
       [(boolean? exp) (M_boolean exp state)]
+      [(and (isVar exp)(eq? 'noSuchBinding (getBinding exp state))) (error 'noSuchBinding (symbol->string exp))]
+      [(and (isVar exp)(eq? (mylength (getBinding exp state)) 1)) (error 'bindingUnassigned (symbol->string exp))]
       [(isVar exp) (operand1 (getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
       [(list? (operand1 exp)) (M_value (cons (operator exp) (cons (M_value (operand1 exp) state) (cons (operand2 exp) '()))) state)]
-      [else (error "Invalid expression" exp)])))
+      [else (error "Invalid expression"
+                   '("Expression" value)' exp)])))
 
 ; defines a file as a program
 (define program (lambda (file) (parser file)))
