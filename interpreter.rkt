@@ -45,6 +45,13 @@
       [(eq? '% x) #t]
       [else       #f])))
 
+; invert a boolean value
+(define invert
+  (lambda (x)
+    (if (eq? x 'true)
+        'false
+        'true)))
+
 ; returns the length of a list
 (define mylength
   (lambda (lis)
@@ -73,11 +80,16 @@
 (define M_boolean
   (lambda (lis state)
     (cond
-      [(and (boolean? lis) (false? lis)) 'false]
-      [(boolean? lis) 'true]
+      [(and (boolean? lis) (false? lis)) (newline)
+                                         (display 'false)
+                                         'false]
+      
+      [(boolean? lis) (newline)
+                      (display 'true)
+                      'true]
       [(eq? '|| (operator lis)) (or (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '&& (operator lis)) (and (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
-      [(eq? '! (operator lis)) (not (M_value (operand1 lis) state))]
+      [(eq? '! (operator lis)) (invert (M_value (operand1 lis) state))]
       [(isCompOp (operator lis)) (M_value (M_comparison lis state) state)]
       [else 'nooperator])))
 
@@ -122,7 +134,6 @@
 ;; If operation
 (define M_if
   (lambda (lis break state)
-    (display (M_boolean (operand1 lis) state))
     (if (> (mylength lis) 3)
         (if (eq? 'true (M_boolean (operand1 lis) state))
             (M_state (operand2 lis) break state)
@@ -137,7 +148,7 @@
 ;; While operation
 (define M_while
   (lambda (lis break state)
-    (if (M_boolean (operand1 lis state) state)
+    (if (eq? 'true (M_boolean (operand1 lis) state))
         (M_while lis break (M_state (operand2 lis) break state))
         state)))
 
@@ -152,7 +163,7 @@
   (lambda (x state)
     (cond
       [(null? state)                                      '()]
-      [(eq? (car x) (car state))                          (display (cons (car state) (cons (cadr x) '()))) (cons (car state) (cons (cadr x) '())) ]
+      [(eq? (car x) (car state))                          (cons (car state) (cons (cadr x) '())) ]
       [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
       [else                                               (cons (car state) (setBinding x (cdr state)))])))
 
@@ -185,14 +196,15 @@
     (cond
       [(null? exp) (error "Empty expression")]
       [(list? exp)
-           (if (isIntOp (operator exp))
-                (M_integer exp state)
-                (M_boolean exp state))]
+           (cond
+             [(isIntOp (operator exp)) (M_integer exp state)]
+             [(eq? 'return (operator exp))  (M_value (operand1 exp) state)]
+             [else (M_boolean exp state)])]
       [(number? exp) exp]
       [(boolean? exp) (M_boolean exp state)]
       [(and (isVar exp)(eq? 'noSuchBinding (getBinding exp state))) (error 'noSuchBinding (symbol->string exp))]
       [(and (isVar exp)(eq? (mylength (getBinding exp state)) 1)) (error 'bindingUnassigned (symbol->string exp))]
-      [(isVar exp) (operand1 (getBinding exp state))]
+      [(isVar exp)(operand1 (getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
       [(number? (operand1 exp)) (M_integer exp state)]
@@ -217,8 +229,6 @@
 (define evaluate
   (lambda (parse break state)
     (cond
-     ; [(eq? (operator parse) '=)
-     ;  (M_state (car parse) state)]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) break (M_state (car parse) break state))]
       [(eq? (operator (car parse)) 'return)
@@ -226,8 +236,7 @@
       [(eq? (operator (car parse)) 'if)
        (evaluate (cdr parse) break (M_if (car parse) break state))]
       [(eq? (operator (car parse)) 'while)
-       (M_while (car parse) break state)
-       (evaluate (cdr parse) break state)]
+       (evaluate (cdr parse) break (M_while (car parse) break state))]
       [(eq? (operator (car parse)) '=)
        (evaluate (cdr parse) break (M_state (car parse) break state))]
       [else (error "Unsupported operation or invalid syntax")])))

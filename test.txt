@@ -1,8 +1,8 @@
-var x = 5;
-var y = 6;
-var m;
-if (x >= y)
-  m = x;
+var x = 100 % 2 == 0;
+var y = 10 >= 20;
+var z;
+if (x || y)
+  z = y;
 else
-  m = y;
-return m;
+  z = x;
+return z;
