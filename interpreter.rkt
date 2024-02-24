@@ -75,7 +75,7 @@
     (cond
       [(number? lis) lis]
       [(isVar lis)   (cdr (getBinding lis state))]
-      [(and (eq? '- (operator lis)) (list? (operand1 lis))) (- (M_value (operand1 lis) state))]
+      [(and (eq? '- (operator lis)) (eq? 2 (mylength  lis))) (- (M_value (operand1 lis) state))]
       [(eq? '/ (operator lis)) (quotient (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '* (operator lis)) (* (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '% (operator lis)) (remainder (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
