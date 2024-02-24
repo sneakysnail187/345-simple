@@ -6,7 +6,19 @@
 (define operand1 (lambda (exp) (cadr exp)))
 (define operand2 caddr)
 (define operand3 cadddr)
-(define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
+;(define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
+
+; defines what a comparison operator is
+(define isCompOp
+  (lambda (x)
+    (cond
+      [(eq? '!= x) #t]
+      [(eq? '== x) #t]
+      [(eq? '<= x) #t]
+      [(eq? '>= x) #t]
+      [(eq? '> x) #t]
+      [(eq? '< x) #t]
+      [else       #f])))
 
 ; defines what a variable is
 (define isVar
@@ -62,9 +74,10 @@
     (cond
       [(and (boolean? lis) (false? lis)) 'false]
       [(boolean? lis) 'true]
-      [(eq? '(| |) (bComparator lis)) (or (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
-      [(eq? '(& &) (bComparator lis)) (and (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '|| (operator lis)) (or (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '&& (operator lis)) (and (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '! (operator lis)) (not (M_value (operand1 lis) state))]
+      [(isCompOp (operator lis)) (M_comparison lis state)]
       [else 'nooperator])))
 
 ;; Comparison ops
@@ -72,12 +85,12 @@
   (lambda (lis state)
     (cond
       [(number? lis) lis]
-      [(eq? '(= =) (bComparator lis)) (eq? (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
-      [(eq? '(! =) (bComparator lis)) (not (eq? (M_value (operand2 lis) state) (M_value (operand3 lis) state)))]
-      [(eq? '(< =) (bComparator lis)) (<= (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
-      [(eq? '(> =) (bComparator lis)) (>= (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
-      [(eq? '< (operator lis)) (< (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
-      [(eq? '> (operator lis)) (> (M_value (operand2 lis) state) (M_value (operand3 lis) state))]
+      [(eq? '== (operator lis)) (eq? (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '!= (operator lis)) (not (eq? (M_value (operand1 lis) state) (M_value (operand2 lis) state)))]
+      [(eq? '<=(operator lis)) (<= (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '>= (operator lis)) (>= (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '< (operator lis)) (< (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(eq? '> (operator lis)) (> (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [else 'nooperator])))
 
 
@@ -107,9 +120,14 @@
 ;; If operation
 (define M_if
   (lambda (lis break state)
-    (if (eq? 'true (M_boolean (operand1 lis) state))
-        (M_state (operand2 lis) break state)
-        (M_state (operand3 lis) break state))))
+    (if (> (mylength lis) 3)
+        (if (eq? 'true (M_boolean (operand1 lis) state))
+            (M_state (operand2 lis) break state)
+            (M_state (operand3 lis) break state))
+        (if (eq? 'true (M_boolean (operand1 lis) state))
+            (M_state (operand2 lis) break state)
+            state))))
+            
 
 ;(evaluate (cdr parse) break (M_state (car parse) state))]
 
