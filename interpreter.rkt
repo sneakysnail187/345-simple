@@ -31,6 +31,8 @@
       [(eq? '* x) #f]
       [(eq? '% x) #f]
       [(eq? '= x) #f]
+      [(eq? 'true x) #f]
+      [(eq? 'false x) #f]
       [(list?  x) #f]
       [else       #t])))
 
@@ -51,6 +53,13 @@
     (if (eq? x 'true)
         'false
         'true)))
+
+; convert #t and #f to true and false
+(define convertBool
+  (lambda (x)
+    (if (eq? x 'true)
+        #t
+        #f)))
 
 ; returns the length of a list
 (define mylength
@@ -80,14 +89,9 @@
 (define M_boolean
   (lambda (lis state)
     (cond
-      [(and (boolean? lis) (false? lis)) (newline)
-                                         (display 'false)
-                                         'false]
-      
-      [(boolean? lis) (newline)
-                      (display 'true)
-                      'true]
-      [(eq? '|| (operator lis)) (or (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
+      [(and (boolean? lis) (false? lis))'false]
+      [(boolean? lis) 'true]
+      [(eq? '|| (operator lis)) (M_boolean(or (convertBool (M_value (operand1 lis) state)) (convertBool(M_value (operand2 lis) state))) state)]
       [(eq? '&& (operator lis)) (and (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '! (operator lis)) (invert (M_value (operand1 lis) state))]
       [(isCompOp (operator lis)) (M_value (M_comparison lis state) state)]
