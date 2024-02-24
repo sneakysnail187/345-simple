@@ -77,7 +77,7 @@
       [(eq? '|| (operator lis)) (or (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '&& (operator lis)) (and (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '! (operator lis)) (not (M_value (operand1 lis) state))]
-      [(isCompOp (operator lis)) (M_comparison lis state)]
+      [(isCompOp (operator lis)) (M_value (M_comparison lis state) state)]
       [else 'nooperator])))
 
 ;; Comparison ops
@@ -120,6 +120,7 @@
 ;; If operation
 (define M_if
   (lambda (lis break state)
+    (display (M_boolean (operand1 lis) state))
     (if (> (mylength lis) 3)
         (if (eq? 'true (M_boolean (operand1 lis) state))
             (M_state (operand2 lis) break state)
@@ -186,6 +187,7 @@
                 (M_integer exp state)
                 (M_boolean exp state))]
       [(number? exp) exp]
+      [(boolean? exp) (M_boolean exp state)]
       [(isVar exp) (operand1 (getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
@@ -217,8 +219,7 @@
       [(eq? (operator (car parse)) 'return)
        (break (M_value (operand1(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
-       (M_if (car parse) break state)
-       (evaluate (cdr parse) break (M_state (car parse) break state))]
+       (evaluate (cdr parse) break (M_if (car parse) break state))]
       [(eq? (operator (car parse)) 'while)
        (M_while (car parse) break state)
        (evaluate (cdr parse) break state)]
