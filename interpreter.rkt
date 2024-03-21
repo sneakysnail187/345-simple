@@ -144,13 +144,13 @@
 
 ;; While operation
 (define M_while
-  (lambda (lis break state next breakExp)
+  (lambda (lis break state next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
         (M_while lis break (M_state (operand2 lis) break state))
         (next state))))
 
 (define loop
-  (lambda (lis break state next breakExp)
+  (lambda (lis break state next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
         (M_while lis break )
     )
@@ -159,7 +159,7 @@
 
 (define repeat
   (lambda (lis break state next)
-    
+    (M_while )
   )
 )
 
