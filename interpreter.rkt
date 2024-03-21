@@ -68,7 +68,6 @@
         0
         (+ 1 (mylength (cdr lis))))))
   
-
 ;; Operations on 2 integers
 (define M_integer
   (lambda (lis state)
@@ -82,8 +81,6 @@
       [(eq? '+ (operator lis)) (+ (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [(eq? '- (operator lis)) (- (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [else 'nooperator])))
-
-
 
 ;; Operations on 1-2 booleans
 (define M_boolean
@@ -110,12 +107,9 @@
       [(eq? '> (operator lis)) (> (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [else 'nooperator])))
 
-
-
 ;; TODO statements - currently tentative
 
 ;; Declare operation
-
 (define M_declare   ;if there is a sublist in the list containing var set the value of the declared variable
   (lambda (lis state)
     (cond
@@ -146,15 +140,28 @@
             (M_state (operand2 lis) break state)
             state))))
             
-
 ;(evaluate (cdr parse) break (M_state (car parse) state))]
 
 ;; While operation
 (define M_while
-  (lambda (lis break state)
+  (lambda (lis break state next breakExp)
     (if (eq? 'true (M_boolean (operand1 lis) state))
         (M_while lis break (M_state (operand2 lis) break state))
-        state)))
+        (next state))))
+
+(define loop
+  (lambda (lis break state next breakExp)
+    (if (eq? 'true (M_boolean (operand1 lis) state))
+        (M_while lis break )
+    )
+  )
+)
+
+(define repeat
+  (lambda (lis break state next)
+    
+  )
+)
 
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
