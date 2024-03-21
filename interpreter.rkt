@@ -128,9 +128,9 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(and (eq? '= (operator lis))(eq? (M_value (operand2 lis) state) 'noSuchBinding)) (error 'noSuchVariable (operand2 lis))]
-      [(and (isVar (operator lis)) (eq? (getBinding (operator lis) state) 'noSuchBinding))    (error 'noSuchVariable)]
-      [(and (eq? '= (operator lis)) (eq? (getBinding (operand1 lis) state) 'noSuchBinding))    (error 'noSuchVariable)]
+      [(and (eq? '= (operator lis))(eq? (M_value (operand2 lis) state) 'noSuchBinding)) (error 'noSuchBinding(symbol->string (operand2 lis)))]
+      [(and (isVar (operator lis)) (eq? (getBinding (operator lis) state) 'noSuchBinding))    (error 'noSuchBinding)]
+      [(and (eq? '= (operator lis)) (eq? (getBinding (operand1 lis) state) 'noSuchBinding))    (error 'noSuchBinding)]
       [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (cons (M_value (operand2 lis) state) '())) state)]
       [(isVar (operator lis))  (setBinding (cons (operator lis) (cons (M_value (operand1 lis) state) '())) state)]
       [else (error "Unsupported operation" (symbol->string (operator lis)))])))
@@ -222,10 +222,6 @@
 ; inteprets a file
 (define interpret
   (lambda (filename)
-    (begin
-         (display "Full parse")
-         (display (parser filename))
-         (newline))
     (if (null? (parser filename))
         (error "Empty program")
         (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
