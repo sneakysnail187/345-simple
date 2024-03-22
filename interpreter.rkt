@@ -153,30 +153,18 @@
 ;         (M_while lis return (M_state (operand2 lis) return state))
 ;         state)))
 
-
 (define M_while
-  (lambda (lis return state)
-    (M_while_cps lis return state (lambda (next) next))
-  )
-)
-
-(define M_while_cps
-  (lambda (lis return state next)
+  (lambda (lis return state break continue throw next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
-        (M_state (operand2 lis) return state (lambda (repeat) (M_while lis return repeat next)))
+        (M_state (operand2 lis) return state
+            (lambda (v1) (next v1))
+            (lambda (v2) (M_while lis return v2 break continue throw next)) throw
+            (lambda (v3) (M_while lis return v3 break continue throw next))
+        )
         (next state)
     )
   )
 )
-
-;(define loop
- ; (lambda (lis break state next)
-  ;  (if (eq? 'true (M_boolean (operand1 lis) state))
-   ;     (M_while lis break )
-    ;)
- ; )
-;)
-
 
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
@@ -226,7 +214,7 @@
 
 ; state function
 (define M_state
-  (lambda (exp return state)
+  (lambda (exp return state break continue throw next)
     (cond
       [(null? exp) (car state)]
       [(and (> (mylength exp) 2) (eq? (operator exp) 'var))
@@ -234,9 +222,11 @@
       [(eq? (operator exp) 'var) (M_declare exp state)]
       [(eq? (operator exp) '=) (M_assign exp state)]
       [(eq? (operator exp) 'if) (M_if exp return state)]
-      [(eq? (operator exp) 'while) (M_while exp return state)]
+      ; [(eq? (operator exp) 'while) (M_while exp return state)]
+      [(eq? (operator exp) 'while) (call/cc (lambda (v) (M_while exp return state v continue throw next)))]
       [(eq? (operator exp) 'return) (return (M_value exp state))]
-      ; [(eq? (operator exp) 'break) (M_while exp return state)]
+      [(eq? (operator exp) 'break) (break state)]
+      [(eq? (operator exp) 'continue) (continue state)]
       [else (error "Unsupported operation" (symbol->string exp))])))
 
 ;; Value operation
