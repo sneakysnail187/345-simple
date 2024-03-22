@@ -113,11 +113,6 @@
       [(eq? '> (operator lis)) (> (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [else 'nooperator])))
 
-<<<<<<< Updated upstream
-;; TODO statements - currently tentative
-
-=======
->>>>>>> Stashed changes
 ;; Declare operation
 (define M_declare   ;if there is a sublist in the list containing var set the value of the declared variable
   (lambda (lis state)
@@ -140,40 +135,44 @@
 
 ;; If operation
 (define M_if
-  (lambda (lis break state)
+  (lambda (lis return state)
     (if (> (mylength lis) 3)
         (if (eq? 'true (M_boolean (operand1 lis) state))
-            (M_state (operand2 lis) break state)
-            (M_state (operand3 lis) break state))
+            (M_state (operand2 lis) return state)
+            (M_state (operand3 lis) return state))
         (if (eq? 'true (M_boolean (operand1 lis) state))
-            (M_state (operand2 lis) break state)
+            (M_state (operand2 lis) return state)
             state))))
-<<<<<<< Updated upstream
-            
-;(evaluate (cdr parse) break (M_state (car parse) state))]
-=======
->>>>>>> Stashed changes
 
 ;; While operation
-(define M_while
-  (lambda (lis break state next)
-    (if (eq? 'true (M_boolean (operand1 lis) state))
-        (M_while lis break (M_state (operand2 lis) break state))
-        (next state))))
+; (define M_while
+;   (lambda (lis return state)
+;     (if (eq? 'true (M_boolean (operand1 lis) state))
+;         (M_while lis return (M_state (operand2 lis) return state))
+;         state)))
 
-(define loop
-  (lambda (lis break state next)
+(define M_while
+  (lambda (lis return state)
+    (M_while_cps lis return state (lambda (next) next))
+  )
+)
+
+(define M_while_cps
+  (lambda (lis return state next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
-        (M_while lis break )
+        (M_state (operand2 lis) return state (lambda (repeat) (M_while lis return repeat next)))
+        (next state)
     )
   )
 )
 
-(define repeat
-  (lambda (lis break state next)
-    (M_while )
-  )
-)
+; (define loop
+;   (lambda (lis return state next)
+;     (if (eq? 'true (M_boolean (operand1 lis) state))
+;         ()
+;     )
+;   )
+; )
 
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
@@ -205,10 +204,10 @@
 ; block function
 
 (define M_block
-  (lambda (exp break state)
+  (lambda (exp return state)
     (if (null? (operand1 exp))
       '()
-      (evaluate (cdr exp) break (addLayer state)))))
+      (evaluate (cdr exp) return (addLayer state)))))
 
 (define addLayer
   (lambda (state)
@@ -220,16 +219,17 @@
 
 ; state function
 (define M_state
-  (lambda (exp break state)
+  (lambda (exp return state)
     (cond
       [(null? exp) (car state)]
       [(and (> (mylength exp) 2) (eq? (operator exp) 'var))
        (M_assign (cdr exp) (M_declare exp state))]
       [(eq? (operator exp) 'var) (M_declare exp state)]
       [(eq? (operator exp) '=) (M_assign exp state)]
-      [(eq? (operator exp) 'if) (M_if exp break state)]
-      [(eq? (operator exp) 'while) (M_while exp break state)]
-      [(eq? (operator exp) 'return) (break(M_value exp state))]
+      [(eq? (operator exp) 'if) (M_if exp return state)]
+      [(eq? (operator exp) 'while) (M_while exp return state)]
+      [(eq? (operator exp) 'return) (return (M_value exp state))]
+      ; [(eq? (operator exp) 'break) (M_while exp return state)]
       [else (error "Unsupported operation" (symbol->string exp))])))
 
 ;; Value operation
@@ -271,19 +271,19 @@
 
 ; mblock should return a state
 (define evaluate
-  (lambda (parse break state)
+  (lambda (parse return state)
     (cond
       [(isBlock (operator (car parse)))
-       (M_block (car parse) break state) (evaluate (cdr parse) break (removeLayer state))]
+       (M_block (car parse) return state) (evaluate (cdr parse) return (removeLayer state))]
       [(eq? (operator (car parse)) 'var)
-       (evaluate (cdr parse) break (M_state (car parse) break state))]
+       (evaluate (cdr parse) return (M_state (car parse) return state))]
       [(eq? (operator (car parse)) 'return)
-       (break (M_value (operand1(car parse)) state))]
+       (return (M_value (operand1(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
-       (evaluate (cdr parse) break (M_if (car parse) break state))]
+       (evaluate (cdr parse) return (M_if (car parse) return state))]
       [(eq? (operator (car parse)) 'while)
-       (evaluate (cdr parse) break (M_while (car parse) break state))]
+       (evaluate (cdr parse) return (M_while (car parse) return state))]
       [(eq? (operator (car parse)) '=)
-       (evaluate (cdr parse) break (M_state (car parse) break state))]
+       (evaluate (cdr parse) return (M_state (car parse) return state))]
       [else (error "Unsupported operation or invalid syntax")])))
 
