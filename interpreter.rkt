@@ -151,6 +151,7 @@
 ;         (M_while lis return (M_state (operand2 lis) return state))
 ;         state)))
 
+<<<<<<< Updated upstream
 (define M_while
   (lambda (lis return state)
     (M_while_cps lis return state (lambda (next) next))
@@ -165,6 +166,15 @@
     )
   )
 )
+=======
+;(define loop
+ ; (lambda (lis break state next)
+  ;  (if (eq? 'true (M_boolean (operand1 lis) state))
+   ;     (M_while lis break )
+    ;)
+ ; )
+;)
+>>>>>>> Stashed changes
 
 ; (define loop
 ;   (lambda (lis return state next)
@@ -203,15 +213,23 @@
 
 ; block function
 
+;needs to return state
+
 (define M_block
   (lambda (exp return state)
     (if (null? (operand1 exp))
+<<<<<<< Updated upstream
       '()
       (evaluate (cdr exp) return (addLayer state)))))
+=======
+      (addLayer state)
+      (evaluate (cdr exp) break (addLayer state)))))
+>>>>>>> Stashed changes
+
 
 (define addLayer
   (lambda (state)
-    (cons '() state)))
+    (append '() state)))
 
 (define removeLayer
   (lambda (state)
@@ -274,7 +292,11 @@
   (lambda (parse return state)
     (cond
       [(isBlock (operator (car parse)))
+<<<<<<< Updated upstream
        (M_block (car parse) return state) (evaluate (cdr parse) return (removeLayer state))]
+=======
+       (evaluate (cdr parse) break (removeLayer (M_block (car parse) break state)))]
+>>>>>>> Stashed changes
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) return (M_state (car parse) return state))]
       [(eq? (operator (car parse)) 'return)
