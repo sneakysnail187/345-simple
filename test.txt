@@ -1,6 +1,7 @@
-var x = 20;
-var y = 128;
-while (x * x > 128)
-  x = x - 1;
-x = x + 1;
+var x = 10;
+{
+  var y = 2;
+  var z = x * y;
+  x = z;
+}
 return x;

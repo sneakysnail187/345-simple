@@ -6,7 +6,6 @@
 (define operand1 (lambda (exp) (cadr exp)))
 (define operand2 caddr)
 (define operand3 cadddr)
-;(define bComparator (lambda (exp) (cons (car exp) (cons (cadr exp) '()))))
 
 ; defines what a comparison operator is
 (define isCompOp
@@ -54,7 +53,14 @@
         'false
         'true)))
 
-; convert #t and #f to true and false
+; check if target indicates a new block
+(define isBlock
+  (lambda (x)
+    (if (eq? x 'begin )
+        #t
+        #f)))
+
+; convert to #t and #f from true and false
 (define convertBool
   (lambda (x)
     (if (eq? x 'true)
@@ -107,8 +113,11 @@
       [(eq? '> (operator lis)) (> (M_value (operand1 lis) state) (M_value (operand2 lis) state))]
       [else 'nooperator])))
 
+<<<<<<< Updated upstream
 ;; TODO statements - currently tentative
 
+=======
+>>>>>>> Stashed changes
 ;; Declare operation
 (define M_declare   ;if there is a sublist in the list containing var set the value of the declared variable
   (lambda (lis state)
@@ -139,8 +148,11 @@
         (if (eq? 'true (M_boolean (operand1 lis) state))
             (M_state (operand2 lis) break state)
             state))))
+<<<<<<< Updated upstream
             
 ;(evaluate (cdr parse) break (M_state (car parse) state))]
+=======
+>>>>>>> Stashed changes
 
 ;; While operation
 (define M_while
@@ -187,6 +199,25 @@
     
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 
+; dedicate a block function to execute code within it, add a layer and remove a layer on exit
+; M_block first then remove layer and continue eval
+
+; block function
+
+(define M_block
+  (lambda (exp break state)
+    (if (null? (operand1 exp))
+      '()
+      (evaluate (cdr exp) break (addLayer state)))))
+
+(define addLayer
+  (lambda (state)
+    (cons '() state)))
+
+(define removeLayer
+  (lambda (state)
+    (cdr state)))
+
 ; state function
 (define M_state
   (lambda (exp break state)
@@ -229,13 +260,21 @@
 ; inteprets a file
 (define interpret
   (lambda (filename)
+    (begin
+      (display "Full Parse")
+      (display (parser filename))
+      (newline))
     (if (null? (parser filename))
         (error "Empty program")
         (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
 
+
+; mblock should return a state
 (define evaluate
   (lambda (parse break state)
     (cond
+      [(isBlock (operator (car parse)))
+       (M_block (car parse) break state) (evaluate (cdr parse) break (removeLayer state))]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) break (M_state (car parse) break state))]
       [(eq? (operator (car parse)) 'return)
