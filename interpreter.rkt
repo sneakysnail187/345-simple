@@ -6,6 +6,8 @@
 (define operand1 (lambda (exp) (cadr exp)))
 (define operand2 caddr)
 (define operand3 cadddr)
+(define depth2 caar)
+(define depth3 caaar)
 
 ; defines what a comparison operator is
 (define isCompOp
@@ -151,7 +153,7 @@
 ;         (M_while lis return (M_state (operand2 lis) return state))
 ;         state)))
 
-<<<<<<< Updated upstream
+
 (define M_while
   (lambda (lis return state)
     (M_while_cps lis return state (lambda (next) next))
@@ -166,7 +168,7 @@
     )
   )
 )
-=======
+
 ;(define loop
  ; (lambda (lis break state next)
   ;  (if (eq? 'true (M_boolean (operand1 lis) state))
@@ -174,21 +176,13 @@
     ;)
  ; )
 ;)
->>>>>>> Stashed changes
 
-; (define loop
-;   (lambda (lis return state next)
-;     (if (eq? 'true (M_boolean (operand1 lis) state))
-;         ()
-;     )
-;   )
-; )
 
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
       [(null? state)             'noSuchBinding] 
-      [(eq? x (car (car state))) (car state)]
+      [(eq? x (depth3 state))    (depth2 state)]
       [else                      (getBinding x (cdr state))])))
 
 (define setBinding ;; takes a binding pair and a state
@@ -202,7 +196,7 @@
 (define addBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state) (cons(cons x '()) '())]
+      [(null? state) (cons(cons(cons x '())'())'())]
       [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable (symbol->string x))] 
       [else (cons (cons x '()) state)])))
     
@@ -218,13 +212,8 @@
 (define M_block
   (lambda (exp return state)
     (if (null? (operand1 exp))
-<<<<<<< Updated upstream
-      '()
-      (evaluate (cdr exp) return (addLayer state)))))
-=======
       (addLayer state)
-      (evaluate (cdr exp) break (addLayer state)))))
->>>>>>> Stashed changes
+      (evaluate (cdr exp) return (addLayer state)))))
 
 
 (define addLayer
@@ -263,7 +252,7 @@
       [(number? exp) exp]
       [(boolean? exp) (M_boolean exp state)]
       [(and (isVar exp)(eq? 'noSuchBinding (getBinding exp state))) (error 'noSuchBinding (symbol->string exp))]
-      [(and (isVar exp)(eq? (mylength (getBinding exp state)) 1)) (error 'bindingUnassigned (symbol->string exp))]
+      [(and (isVar exp)(eq? (mylength (getBinding exp state)) 1)) (display (getBinding exp state))(error 'bindingUnassigned (symbol->string exp))]
       [(isVar exp)(operand1 (getBinding exp state))]
       [(or (eq? exp 'true)  (eq? exp 'false)) exp]
       [(boolean? (operand1 exp)) (M_boolean (operand1 exp) state)]
@@ -286,17 +275,12 @@
         (error "Empty program")
         (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
 
-
 ; mblock should return a state
 (define evaluate
   (lambda (parse return state)
     (cond
       [(isBlock (operator (car parse)))
-<<<<<<< Updated upstream
-       (M_block (car parse) return state) (evaluate (cdr parse) return (removeLayer state))]
-=======
-       (evaluate (cdr parse) break (removeLayer (M_block (car parse) break state)))]
->>>>>>> Stashed changes
+       (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state)))]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) return (M_state (car parse) return state))]
       [(eq? (operator (car parse)) 'return)
