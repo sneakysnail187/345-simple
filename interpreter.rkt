@@ -6,7 +6,9 @@
 (define operand1 (lambda (exp) (cadr exp)))
 (define operand2 caddr)
 (define operand3 cadddr)
+(define depth1 car)
 (define depth2 caar)
+(define depth2b caadr)
 (define depth3 caaar)
 
 ; defines what a comparison operator is
@@ -128,7 +130,7 @@
   (lambda (lis state)
     (cond
       [(null? lis) '()]
-      [(and (eq? '= (operator lis))(eq? (M_value (operand2 lis) state) 'noSuchBinding)) (error 'noSuchBinding(symbol->string (operand2 lis)))]
+      [(and (eq? '= (operator lis))(eq? (M_value (operand2 lis) state) 'noSuchBinding)) (error 'noSuchBinding(symbol->string (operand2 lis)))] ;this
       [(and (isVar (operator lis)) (eq? (getBinding (operator lis) state) 'noSuchBinding))    (error 'noSuchBinding)]
       [(and (eq? '= (operator lis)) (eq? (getBinding (operand1 lis) state) 'noSuchBinding))    (error 'noSuchBinding)]
       [(eq? '= (operator lis)) (setBinding (cons (operand1 lis) (cons (M_value (operand2 lis) state) '())) state)]
@@ -170,21 +172,22 @@
   (lambda (x state)
     (cond
       [(null? state)             'noSuchBinding] 
-      [(eq? x (depth3 state))    (depth2 state)]
+      [(eq? x (depth2 state))    (depth1 state)]
       [else                      (getBinding x (cdr state))])))
 
 (define setBinding ;; takes a binding pair and a state
   (lambda (x state)
     (cond
       [(null? state)                                      '()]
-      [(eq? (car x) (car state))                          (cons (car state) (cons (cadr x) '())) ]
-      [(list? (car state))                                (cons (setBinding x (car state)) (setBinding x (cdr state)))]
-      [else                                               (cons (car state) (setBinding x (cdr state)))])))
+      [(eq? (depth1 x) (depth2 state))                    (cons (cons (depth2 state) (cons (cadr x) '())) '()) ]
+      [(list? (depth2 state))                             (cons (setBinding x (depth2 state)) (setBinding x (operand1 state)))]
+      [else                                               (cons (depth2 state) (setBinding x (operand1 state)))])))
 
 (define addBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state) (cons(cons(cons x '())'())'())]
+      [(null? state) (cons(cons x '())'())]
+      [(eq? (depth1 state) '()) (cons(cons x '()) (depth1 state))]
       [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable (symbol->string x))] 
       [else (cons (cons x '()) state)])))
     
@@ -205,7 +208,8 @@
 
 (define addLayer
   (lambda (state)
-    (append '() state)))
+    (display (list '() state))
+    (list '() state)))
 
 (define removeLayer
   (lambda (state)
