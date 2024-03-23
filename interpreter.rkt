@@ -159,11 +159,52 @@
   (lambda (lis return state break continue throw next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
         (M_state (operand2 lis) return state
-            (lambda (v1) (next v1)) ;; break
-            (lambda (v2) (M_while lis return v2 break continue throw next)) throw ;; continue
-            (lambda (v3) (M_while lis return v3 break continue throw next)) ;; next
+            (lambda (v1) (next v1)) ; break
+            (lambda (v2) (M_while lis return v2 break continue throw next)) throw ; continue
+            (lambda (v3) (M_while lis return v3 break continue throw next)) ; next
         )
         (next state)
+    )
+  )
+)
+
+;; try catch finally
+(define M_try_catch
+  (lambda (lis return state break continue throw next)
+      (M_state (operand1 lis) 
+        ; return
+        (lambda (v s) (M_state (finallyblock exp) return s break continue throw (lambda (s1) (return v s1)))) state
+        ; break
+        (lambda (s) (M_state (finallyblock exp) return s break continue throw break))
+        ; continue
+        (lambda (s) (M_state (finallyblock exp) return s break continue throw continue))
+        ; throw
+        (lambda (e s) (M_state (finallyblock exp) 
+          ; return
+          (lambda (v1 s1) (M_state (finallyblock exp) return s1 break continue throw (lambda (s2) (return v1 s2)))
+          ; state
+          (setBinding (cons (operand1 (operand2 exp)) (cons e '())) s)
+          ; break
+          (lambda (s) (M_state (finallyblock exp) return s break continue throw break))
+          ; continue
+          (lambda (s) (M_state (finallyblock exp) return s break continue throw continue))
+          ; throw
+          (lambda (e1 s1) (M_state (finallyblock exp) return s1 break continue throw (lambda (s2) (throw e1 s2))))
+          ; next
+          (lambda (s) (M_state (finallyblock exp) return s break continue throw next))
+        )))
+        ; next
+        (lambda (s) (M_state (finallyblock exp) return s break continue throw next))
+      )
+  )
+)
+
+;; abstraction for finally
+(define finallyblock
+  (lambda (exp)
+    (if (null? (operand3 exp))
+        '()
+        (operand1 (operand3 exp))
     )
   )
 )
@@ -190,7 +231,7 @@
       [(eq? (depth1 state) '()) (cons(cons x '()) (depth1 state))]
       [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable (symbol->string x))] 
       [else (cons (cons x '()) state)])))
-    
+
 ;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
 
 ; dedicate a block function to execute code within it, add a layer and remove a layer on exit
@@ -229,6 +270,7 @@
       [(eq? (operator exp) 'return) (return (M_value exp state))]
       [(eq? (operator exp) 'break) (break state)]
       [(eq? (operator exp) 'continue) (continue state)]
+      [(eq? (operator exp) 'try) (M_try_catch exp state break)]
       [else (error "Unsupported operation" (symbol->string exp))])))
 
 ;; Value operation
@@ -265,7 +307,7 @@
       (newline))
     (if (null? (parser filename))
         (error "Empty program")
-        (call/cc (lambda (v1 v2 v3 v4 v5) (evaluate (parser filename) v1 '() v2 v3 v4 v5))))))
+        (call/cc (lambda (v) (evaluate (parser filename) v '()))))))
 
 ; mblock should return a state
 (define evaluate
