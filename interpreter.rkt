@@ -172,29 +172,29 @@
 (define M_try_catch
   (lambda (lis return state break continue throw next)
       (M_state (operand1 lis) 
-        ; return
-        (lambda (v s) (M_state (finallyblock exp) return s break continue throw (lambda (s1) (return v s1)))) state
-        ; break
-        (lambda (s) (M_state (finallyblock exp) return s break continue throw break))
-        ; continue
-        (lambda (s) (M_state (finallyblock exp) return s break continue throw continue))
-        ; throw
-        (lambda (e s) (M_state (finallyblock exp) 
           ; return
-          (lambda (v1 s1) (M_state (finallyblock exp) return s1 break continue throw (lambda (s2) (return v1 s2)))
-          ; state
-          (setBinding (cons (operand1 (operand2 exp)) (cons e '())) s)
+          (lambda (v s) (M_state (finallyblock exp) return s break continue throw (lambda (s1) (return v s1)))) state
           ; break
           (lambda (s) (M_state (finallyblock exp) return s break continue throw break))
           ; continue
           (lambda (s) (M_state (finallyblock exp) return s break continue throw continue))
           ; throw
-          (lambda (e1 s1) (M_state (finallyblock exp) return s1 break continue throw (lambda (s2) (throw e1 s2))))
+          (lambda (e s) (M_state (finallyblock exp) 
+              ; return
+              (lambda (v1 s1) (M_state (finallyblock exp) return s1 break continue throw (lambda (s2) (return v1 s2))))
+              ; state
+              (setBinding (cons (operand1 (operand2 exp)) (cons e '())) s)
+              ; break
+              (lambda (s) (M_state (finallyblock exp) return s break continue throw break))
+              ; continue
+              (lambda (s) (M_state (finallyblock exp) return s break continue throw continue))
+              ; throw
+              (lambda (e1 s1) (M_state (finallyblock exp) return s1 break continue throw (lambda (s2) (throw e1 s2))))
+              ; next
+              (lambda (s) (M_state (finallyblock exp) return s break continue throw next))
+          ))
           ; next
           (lambda (s) (M_state (finallyblock exp) return s break continue throw next))
-        )))
-        ; next
-        (lambda (s) (M_state (finallyblock exp) return s break continue throw next))
       )
   )
 )
