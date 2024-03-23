@@ -307,7 +307,7 @@
       (newline))
     (if (null? (parser filename))
         (error "Empty program")
-        (call/cc (lambda (v) (evaluate (parser filename) v '()))))))
+        (call/cc (lambda (v) (evaluate (parser filename) v '() (lambda (s1) s1) (lambda (s2) s2) (lambda (s3) s3) (lambda (s4) s4)))))))
 
 ; mblock should return a state
 (define evaluate
@@ -316,7 +316,7 @@
       [(isBlock (operator (car parse)))
        (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state)))]
       [(eq? (operator (car parse)) 'var)
-       (evaluate (cdr parse) return (M_state (car parse) return state))]
+       (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next))]
       [(eq? (operator (car parse)) 'return)
        (return (M_value (operand1(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
