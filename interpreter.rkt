@@ -157,9 +157,9 @@
   (lambda (lis return state break continue throw next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
         (M_state (operand2 lis) return state
-            (lambda (v1) (next v1))
-            (lambda (v2) (M_while lis return v2 break continue throw next)) throw
-            (lambda (v3) (M_while lis return v3 break continue throw next))
+            (lambda (v1) (next v1)) ;; break
+            (lambda (v2) (M_while lis return v2 break continue throw next)) throw ;; continue
+            (lambda (v3) (M_while lis return v3 break continue throw next)) ;; next
         )
         (next state)
     )
@@ -203,7 +203,6 @@
       (addLayer state)
       (evaluate (cdr exp) return (addLayer state)))))
 
-
 (define addLayer
   (lambda (state)
     (append '() state)))
@@ -222,7 +221,6 @@
       [(eq? (operator exp) 'var) (M_declare exp state)]
       [(eq? (operator exp) '=) (M_assign exp state)]
       [(eq? (operator exp) 'if) (M_if exp return state)]
-      ; [(eq? (operator exp) 'while) (M_while exp return state)]
       [(eq? (operator exp) 'while) (call/cc (lambda (v) (M_while exp return state v continue throw next)))]
       [(eq? (operator exp) 'return) (return (M_value exp state))]
       [(eq? (operator exp) 'break) (break state)]
@@ -263,11 +261,11 @@
       (newline))
     (if (null? (parser filename))
         (error "Empty program")
-        (call/cc (lambda (k) (evaluate (parser filename) k '()))))))
+        (call/cc (lambda (v1 v2 v3 v4 v5) (evaluate (parser filename) v1 '() v2 v3 v4 v5))))))
 
 ; mblock should return a state
 (define evaluate
-  (lambda (parse return state)
+  (lambda (parse return state break continue throw next)
     (cond
       [(isBlock (operator (car parse)))
        (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state)))]
@@ -278,7 +276,7 @@
       [(eq? (operator (car parse)) 'if)
        (evaluate (cdr parse) return (M_if (car parse) return state))]
       [(eq? (operator (car parse)) 'while)
-       (evaluate (cdr parse) return (M_while (car parse) return state))]
+       (evaluate (cdr parse) return (call/cc (lambda (v) (M_while (car parse) return state v continue throw next))))] ;; (call/cc (lambda (v) (M_while exp return state v continue throw next)))
       [(eq? (operator (car parse)) '=)
        (evaluate (cdr parse) return (M_state (car parse) return state))]
       [else (error "Unsupported operation or invalid syntax")])))
