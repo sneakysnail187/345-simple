@@ -314,7 +314,7 @@
   (lambda (parse return state break continue throw next)
     (cond
       [(isBlock (operator (car parse)))
-       (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state break continue throw next)))]
+       (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state break continue throw next)) break continue throw next)]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
       [(eq? (operator (car parse)) 'return)
