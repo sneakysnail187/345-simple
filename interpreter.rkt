@@ -316,7 +316,7 @@
       [(isBlock (operator (car parse)))
        (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state)))]
       [(eq? (operator (car parse)) 'var)
-       (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next))]
+       (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
       [(eq? (operator (car parse)) 'return)
        (return (M_value (operand1(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
