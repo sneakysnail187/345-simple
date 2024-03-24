@@ -271,6 +271,7 @@
       [(eq? (operator exp) 'break) (break state)]
       [(eq? (operator exp) 'continue) (continue state)]
       [(eq? (operator exp) 'try) (M_try_catch exp return (addLayer state) )]
+      [(list? (operator exp)) (M_state (operator exp) return state break continue throw next)]
       [else (error "Unsupported operation" (symbol->string exp))])))
 
 ;; Value operation
