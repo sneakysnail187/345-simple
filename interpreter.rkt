@@ -242,10 +242,10 @@
 ;needs to return state
 
 (define M_block
-  (lambda (exp return state)
+  (lambda (exp return state break continue throw next)
     (if (null? (operand1 exp))
       (addLayer state)
-      (evaluate (cdr exp) return (addLayer state)))))
+      (M_state (cdr exp) return (addLayer state) break continue throw next))))
 
 (define addLayer
   (lambda (state)
@@ -314,9 +314,9 @@
   (lambda (parse return state break continue throw next)
     (cond
       [(isBlock (operator (car parse)))
-       (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state)))]
+       (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state break continue throw next)))]
       [(eq? (operator (car parse)) 'var)
-       (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next))]
+       (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
       [(eq? (operator (car parse)) 'return)
        (return (M_value (operand1(car parse)) state))]
       [(eq? (operator (car parse)) 'if)
