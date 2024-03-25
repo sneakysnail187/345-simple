@@ -149,12 +149,6 @@
             state))))
 
 ;; While operation
-; (define M_while
-;   (lambda (lis return state)
-;     (if (eq? 'true (M_boolean (operand1 lis) state))
-;         (M_while lis return (M_state (operand2 lis) return state))
-;         state)))
-
 (define M_while
   (lambda (lis return state break continue throw next)
     (if (eq? 'true (M_boolean (operand1 lis) state))
@@ -249,12 +243,11 @@
 
 (define addLayer
   (lambda (state)
-    (display (list '() state))
     (list '() state)))
 
 (define removeLayer
   (lambda (state)
-    (cdr state)))
+    (display(cdr state))))
 
 ; state function
 (define M_state
