@@ -1,7 +1,3 @@
 var x = 10;
-{
-  var y = 2;
-  var z = x * y;
-  x = z;
-}
-return x;
+var y = 12 + x;
+return x * y;

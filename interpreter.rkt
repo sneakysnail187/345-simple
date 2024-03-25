@@ -203,10 +203,17 @@
   )
 )
 
+(define checkDepth
+  (lambda (state)
+    (if (not(list?(car state)))
+        1
+        (+ 1 (checkDepth (car state))))))
+
 (define getBinding ;; takes a variable name and a state
   (lambda (x state)
     (cond
-      [(null? state)             'noSuchBinding] 
+      [(null? state)             'noSuchBinding]
+      [(and (< 2 (checkDepth state)) (eq? x (depth3 state))) (depth2 state)]
       [(eq? x (depth2 state))    (depth1 state)]
       [else                      (getBinding x (cdr state))])))
 
@@ -214,6 +221,7 @@
   (lambda (x state)
     (cond
       [(null? state)                                      '()]
+      [(and (< 2 (checkDepth state)) (eq? (depth1 x) (depth3 state))) (cons(cons (cons (depth3 state) (cons (cadr x) '())) '()) '())]
       [(eq? (depth1 x) (depth2 state))                    (cons (cons (depth2 state) (cons (cadr x) '())) '()) ]
       [(list? (depth2 state))                             (cons (setBinding x (depth2 state)) (setBinding x (operand1 state)))]
       [else                                               (cons (depth2 state) (setBinding x (operand1 state)))])))
@@ -222,18 +230,11 @@
   (lambda (x state)
     (cond
       [(null? state) (cons(cons x '())'())]
-      [(eq? (depth1 state) '()) (display(cons (cons(cons x '()) (depth1 state)) (cdr state)))]
+      [(eq? (depth1 state) '()) (cons(cons(cons x '()) (depth1 state))(cdr state))]
       [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable (symbol->string x))] 
       [else (cons (cons x '()) state)])))
 
-;; store the state in the stack, use tail recursion to continuously read and alter the state as you recursively go through the program
-
-; dedicate a block function to execute code within it, add a layer and remove a layer on exit
-; M_block first then remove layer and continue eval
-
 ; block function
-
-;needs to return state
 
 (define M_block
   (lambda (exp return state break continue throw next)
@@ -320,6 +321,6 @@
       [(eq? (operator (car parse)) 'while)
        (evaluate (cdr parse) return (call/cc (lambda (v) (M_while (car parse) return state v continue throw next))))] ;; (call/cc (lambda (v) (M_while exp return state v continue throw next)))
       [(eq? (operator (car parse)) '=)
-       (evaluate (cdr parse) return (M_state (car parse) return state))]
+       (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
       [else (error "Unsupported operation or invalid syntax")])))
 
