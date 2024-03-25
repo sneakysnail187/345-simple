@@ -321,10 +321,6 @@
       [(eq? (operator (car parse)) 'while)
        (evaluate (cdr parse) return (call/cc (lambda (v) (M_while (car parse) return state v continue throw next))))] ;; (call/cc (lambda (v) (M_while exp return state v continue throw next)))
       [(eq? (operator (car parse)) '=)
-<<<<<<< Updated upstream
        (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
-=======
-       (evaluate (cdr parse) return (M_state (car parse) return state) break continue throw next)]
->>>>>>> Stashed changes
       [else (error "Unsupported operation or invalid syntax")])))
 
