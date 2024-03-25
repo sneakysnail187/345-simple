@@ -222,7 +222,7 @@
   (lambda (x state)
     (cond
       [(null? state) (cons(cons x '())'())]
-      [(eq? (depth1 state) '()) (cons(cons x '()) (depth1 state))]
+      [(eq? (depth1 state) '()) (display(cons (cons(cons x '()) (depth1 state)) (cdr state)))]
       [(not(eq?(getBinding x state) 'noSuchBinding)) (error 'redefinedVariable (symbol->string x))] 
       [else (cons (cons x '()) state)])))
 
@@ -247,7 +247,9 @@
 
 (define removeLayer
   (lambda (state)
-    (display(cdr state))))
+    (if (and (list? state) (not (null? state)) (list? (car state)))
+        (cdr state)
+        state)))
 
 ; state function
 (define M_state
@@ -308,7 +310,7 @@
   (lambda (parse return state break continue throw next)
     (cond
       [(isBlock (operator (car parse)))
-       (evaluate (cdr parse) return (removeLayer (M_block (car parse) return state break continue throw next)) break continue throw next)]
+       (evaluate (cdr parse) return (removeLayer(M_block (car parse) return state break continue throw next)) break continue throw next)]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
       [(eq? (operator (car parse)) 'return)
