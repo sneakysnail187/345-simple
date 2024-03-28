@@ -141,12 +141,12 @@
 (define M_if
   (lambda (lis return state break continue throw next)
     (if (> (mylength lis) 3)
+         (if (eq? 'true (M_boolean (operand1 lis) state break continue throw next))
+            (M_state (operand2 lis) return state break continue throw next)
+            (M_state (operand3 lis) return state break continue throw next))
         (if (eq? 'true (M_boolean (operand1 lis) state break continue throw next))
             (M_state (operand2 lis) return state break continue throw next)
-            (M_state (operand3 lis) return state) break continue throw next)
-        (if (eq? 'true (M_boolean (operand1 lis) state break continue throw next))
-            (M_state (operand2 lis) return state break continue throw next)
-            state))))
+            (next state)))))
 
 ;; While operation
 (define M_while
