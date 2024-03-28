@@ -221,8 +221,8 @@
   (lambda (x state)
     (cond
       [(null? state)                                      '()]
-      [(and (< 2 (checkDepth state)) (eq? (depth1 x) (depth3 state))) (cons(cons (cons (depth3 state) (cons (cadr x) '())) '()) '())]
-      [(eq? (depth1 x) (depth2 state))                    (cons (cons (depth2 state) (cons (cadr x) '())) '()) ]
+      [(and (< 2 (checkDepth state)) (eq? (depth1 x) (depth3 state))) (cons(cons (cons (depth3 state) (cons (cadr x) '())) '()) (cdr state))] ;this one too i think
+      [(eq? (depth1 x) (depth2 state))                    (cons (cons (depth2 state) (cons (cadr x) '())) (cdr state)) ] ; cons onto front layer of state ^^^
       [(list? (depth2 state))                             (cons (setBinding x (depth2 state)) (setBinding x (operand1 state)))]
       [else                                               (cons (depth2 state) (setBinding x (operand1 state)))])))
 
@@ -239,8 +239,8 @@
 (define M_block
   (lambda (exp return state break continue throw next)
     (if (null? (operand1 exp))
-      (addLayer state)
-      (M_state (cdr exp) return (addLayer state) break continue throw next))))
+      state
+      (removeLayer (M_state (cdr exp) return (addLayer state) break continue throw next)))))
 
 (define addLayer
   (lambda (state)
@@ -311,7 +311,7 @@
   (lambda (parse return state break continue throw next)
     (cond
       [(isBlock (operator (car parse)))
-       (evaluate (cdr parse) return (removeLayer(M_block (car parse) return state break continue throw next)) break continue throw next)]
+       (evaluate (cdr parse) return (M_block (car parse) return state break continue throw next) break continue throw next)]
       [(eq? (operator (car parse)) 'var)
        (evaluate (cdr parse) return (M_state (car parse) return state break continue throw next) break continue throw next)]
       [(eq? (operator (car parse)) 'return)
