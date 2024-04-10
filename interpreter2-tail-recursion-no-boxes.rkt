@@ -51,6 +51,11 @@
       ((eq? 'funcall (statement-type statement)) (interpret-function-call statement environment return break continue throw next))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
+; funcall should call an M_value function that:
+; creates the function environment from the current one,
+; evaluate actual params in the current env and bind them to formal params in function,
+; interprets the body of the function with the function env
+
 ; Calls the return continuation with the given expression value
 (define interpret-return
   (lambda (statement environment return)
@@ -96,17 +101,18 @@
                                          (lambda (v env) (throw v (pop-frame env)))
                                          (lambda (env) (next (pop-frame env))))))
 
+; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
+; and a way to create the function environment from the current one
+
+
+; function parse is:  (function fname (formal param list) fbody)
 ; ***WIP***
-; Interprets a function definition.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment
+; Interprets a function definition. ; still figuring out the function to create the function environment
 (define interpret-function
-  (lambda (statement environment return break continue throw next)
-     (interpret-statement-list (cdr statement)
-                                         (push-frame environment)
-                                         return
-                                         (lambda (env) (break (pop-frame env)))
-                                         (lambda (env) (continue (pop-frame env)))
-                                         (lambda (v env) (throw v (pop-frame env)))
-                                         (lambda (env) (next (pop-frame env))))))
+  (lambda (statement environment next)
+    (if (exists-declare-body? statement)
+        (next (insert-function (get-declare-name statement) (get-declare-params statement) (get-declare-body statement) environment))
+        (next (insert-function (get-declare-name statement) 'novalue 'novalue environment)))))
 
 ; ***WIP***
 ; Interprets a function call.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment (not 100% on that for this one)
@@ -119,6 +125,7 @@
                                          (lambda (env) (continue (pop-frame env)))
                                          (lambda (v env) (throw v (pop-frame env)))
                                          (lambda (env) (next (pop-frame env))))))
+
 ; We use a continuation to throw the proper value.  Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
   (lambda (statement environment throw)
@@ -237,7 +244,11 @@
 (define get-expr operand1)
 (define get-declare-var operand1)
 (define get-declare-value operand2)
+(define get-declare-name operand1)
+(define get-declare-params operand2)
+(define get-declare-body operand3)
 (define exists-declare-value? exists-operand2?)
+(define exists-declare-body? exists-operand3?)
 (define get-assign-lhs operand1)
 (define get-assign-rhs operand2)
 (define get-condition operand1)
@@ -349,6 +360,13 @@
     (if (exists-in-list? var (variables (car environment)))
         (myerror "error: variable is being re-declared:" var)
         (cons (add-to-frame var (box (scheme->language val)) (car environment)) (cdr environment))))) ;changed to box here
+
+; Adds a new function/closure binding pair into the environment.  Gives an error if the function already exists in this frame.
+(define insert-function
+  (lambda (name params body environment)
+    (if (exists-in-list? name (variables (car environment)))
+        (myerror "error: function is being re-declared:" name)
+        (cons (add-to-frame name (list params body) (car environment)) (cdr environment)))))
 
 ; Changes the binding of a variable to a new value in the environment.  Gives an error if the variable does not exist.
 (define update
