@@ -104,6 +104,9 @@
 ; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
 ; and a way to create the function environment from the current one
 
+; function to create env should push a new frame onto the stack and populate it with all variables and functions that were in scope in the previous (global)frame
+; similar to block
+
 
 ; function parse is:  (function fname (formal param list) fbody)
 ; ***WIP***
