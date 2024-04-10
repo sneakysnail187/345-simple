@@ -108,6 +108,23 @@
 ; similar to block
 
 
+
+(define copy-environment 
+  (lambda (vars store environment)
+    (cons vars (car (cons store (cdr (push-frame environment)))))))
+
+(define add-parameters
+  (lambda (params environment)
+    (if (null? params)
+        environment
+        (add-parameters (cdr params)(insert (car params) 'novalue environment)))))
+
+(define get-function-environment ;makes function environment from current
+  (lambda (environment params)
+    (if (null? params)
+        (copy-environment (variables environment) (store environment) environment)
+        (add-parameters params (copy-environment (variables environment) (store environment) environment)))))
+
 ; function parse is:  (function fname (formal param list) fbody)
 ; ***WIP***
 ; Interprets a function definition. ; still figuring out the function to create the function environment
