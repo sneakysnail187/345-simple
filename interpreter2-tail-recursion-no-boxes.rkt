@@ -1,6 +1,5 @@
-; If you are using scheme instead of racket, comment these two lines, uncomment the (load "simpleParser.scm") and comment the (require "simpleParser.rkt")
 #lang racket
-(require "simpleParser.rkt")
+(require "functionParser.rkt")
 ; (load "simpleParser.scm")
 
 ; An interpreter for the simple language using tail recursion for the M_state functions and does not handle side effects.
@@ -48,6 +47,8 @@
       ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw next))
       ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw next))
+      ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw next))
+      ((eq? 'funcall (statement-type statement)) (interpret-function-call statement environment return break continue throw next))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
 ; Calls the return continuation with the given expression value
@@ -95,6 +96,29 @@
                                          (lambda (v env) (throw v (pop-frame env)))
                                          (lambda (env) (next (pop-frame env))))))
 
+; ***WIP***
+; Interprets a function definition.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment
+(define interpret-function
+  (lambda (statement environment return break continue throw next)
+     (interpret-statement-list (cdr statement)
+                                         (push-frame environment)
+                                         return
+                                         (lambda (env) (break (pop-frame env)))
+                                         (lambda (env) (continue (pop-frame env)))
+                                         (lambda (v env) (throw v (pop-frame env)))
+                                         (lambda (env) (next (pop-frame env))))))
+
+; ***WIP***
+; Interprets a function call.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment (not 100% on that for this one)
+(define interpret-function-call
+  (lambda (statement environment return break continue throw next)
+     (interpret-statement-list (cdr statement)
+                                         (push-frame environment)
+                                         return
+                                         (lambda (env) (break (pop-frame env)))
+                                         (lambda (env) (continue (pop-frame env)))
+                                         (lambda (v env) (throw v (pop-frame env)))
+                                         (lambda (env) (next (pop-frame env))))))
 ; We use a continuation to throw the proper value.  Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
   (lambda (statement environment throw)
