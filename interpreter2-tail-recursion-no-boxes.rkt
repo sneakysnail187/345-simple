@@ -129,7 +129,7 @@
 ; ***WIP***
 ; Interprets a function definition. ; still figuring out the function to create the function environment
 (define interpret-function
-  (lambda (statement environment next)
+  (lambda (statement environment next) ;time to test
     (if (exists-declare-body? statement)
         (next (insert-function (get-declare-name statement) (get-declare-params statement) (get-declare-body statement) environment))
         (next (insert-function (get-declare-name statement) 'novalue 'novalue environment)))))
@@ -145,6 +145,23 @@
                                          (lambda (env) (continue (pop-frame env)))
                                          (lambda (v env) (throw v (pop-frame env)))
                                          (lambda (env) (next (pop-frame env))))))
+
+; Helper function for lookup on functions 
+(define lookup-function
+  (lambda (name environment)
+    (let ((body (lookup-in-env name environment)))
+      (if (eq? 'novalue body)
+          (myerror "error: function without a body:" name)
+          body))))
+
+; Return the body bound to a function in the environment
+(define lookup-function-in-env
+  (lambda (name environment)
+    (cond
+      ((null? environment) (myerror "error: undefined function" name))
+      ((exists-in-list? name (variables (topframe environment))) (lookup-in-frame name (topframe environment)))
+      (else (lookup-in-env name (cdr environment))))))
+
 
 ; We use a continuation to throw the proper value.  Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
@@ -339,7 +356,7 @@
   (lambda (var environment)
     (let ((value (lookup-in-env var environment)))
       (if (eq? 'novalue value)
-          (myerror "error: variable without an assigned value:" var)
+          (myerror "error: variable without an assigned value:" var)  ;may not play nice with adding formal parameters
           value))))
 
 ; Return the value bound to a variable in the environment
