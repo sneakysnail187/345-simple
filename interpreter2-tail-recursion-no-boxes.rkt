@@ -123,7 +123,7 @@
   (lambda (environment params)
     (if (null? params)
         (copy-environment (variables environment) (store environment) environment)
-        (add-parameters params (copy-environment (variables environment) (store environment) environment)))))
+        (add-parameters params (copy-environment (variables environment) (store environment) environment))))) 
 
 ; function parse is:  (function fname (formal param list) fbody)
 ; ***WIP***
@@ -135,16 +135,25 @@
         (next (insert-function (get-declare-name statement) 'novalue 'novalue environment)))))
 
 ; ***WIP***
+; ***please review this as Im not sure if this is the correct structure***
 ; Interprets a function call.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment (not 100% on that for this one)
 (define interpret-function-call
   (lambda (statement environment return break continue throw next)
-     (interpret-statement-list (cdr statement)
-                                         (push-frame environment)
-                                         return
-                                         (lambda (env) (break (pop-frame env)))
-                                         (lambda (env) (continue (pop-frame env)))
-                                         (lambda (v env) (throw v (pop-frame env)))
-                                         (lambda (env) (next (pop-frame env))))))
+    (letrec
+      [
+        (closure (get-function-environment environment (function-param statement)))
+        (closure-body (lookup-function (function-name statement) environment))
+      ]
+      (interpret-statement-list closure-body
+                                        closure
+                                        (lambda (v) v)
+                                        (lambda (s) (myerror "error: break used outside a loop"))
+                                        (lambda (s) (myerror "error: continue used outside a loop"))
+                                        (lambda (v env) (throw v (pop-frame env)))
+                                        (lambda (env) (next (pop-frame env)))))))
+
+(define function-name operand2)
+(define function-param cddr)
 
 ; Helper function for lookup on functions 
 (define lookup-function
