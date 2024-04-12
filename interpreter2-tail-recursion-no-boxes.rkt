@@ -20,9 +20,11 @@
 ; interprets a list of statements.  The state/environment from each statement is used for the next ones.
 (define interpret-statement-list
   (lambda (statement-list environment return break continue throw next)
-    (if (null? statement-list)
-        (next environment)
-        (interpret-statement (car statement-list) environment return break continue throw (lambda (env) (interpret-statement-list (cdr statement-list) env return break continue throw next))))))
+    (cond
+      ((and (exists-in-list? 'main (variables environment))(null? statement-list))
+       (interpret-statement-list (lookup-function 'main environment) environment return break continue throw next))
+      ((null? statement-list) (next environment)) ; if environment contains main and reaches the end then run main else keep previous behavior
+      (else (interpret-statement (car statement-list) environment return break continue throw (lambda (env) (interpret-statement-list (cdr statement-list) env return break continue throw next)))))))
 
 ; interpret a statement in the environment with continuations for return, break, continue, throw, and "next statement"
 (define interpret-statement
@@ -98,8 +100,6 @@
 ; function to create env should push a new frame onto the stack and populate it with all variables and functions that were in scope in the previous (global)frame
 ; similar to block
 
-
-
 (define copy-environment 
   (lambda (vars store environment)
     (cons vars (car (cons store (cdr (push-frame environment)))))))
@@ -142,9 +142,6 @@
                                         (lambda (s) (myerror "error: continue used outside a loop"))
                                         (lambda (v env) (throw v (pop-frame env)))
                                         (lambda (env) (next (pop-frame env)))))))
-
-(define function-name operand2)
-(define function-param cddr)
 
 ; Helper function for lookup on functions 
 (define lookup-function
@@ -296,6 +293,8 @@
 (define get-try operand1)
 (define get-catch operand2)
 (define get-finally operand3)
+(define function-name operand2)
+(define function-param cddr)
 
 (define catch-var
   (lambda (catch-statement)
