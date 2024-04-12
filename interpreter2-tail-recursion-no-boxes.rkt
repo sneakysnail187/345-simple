@@ -1,5 +1,6 @@
+; If you are using scheme instead of racket, comment these two lines, uncomment the (load "simpleParser.scm") and comment the (require "simpleParser.rkt")
 #lang racket
-(require "functionParser.rkt")
+(require "simpleParser.rkt")
 ; (load "simpleParser.scm")
 
 ; An interpreter for the simple language using tail recursion for the M_state functions and does not handle side effects.
@@ -7,14 +8,6 @@
 ; The functions that start interpret-...  all return the current environment.  These are the M_state functions.
 ; The functions that start eval-...  all return a value.  These are the M_value and M_boolean functions.
 
-; Define a box data structures
-(define (box v) (cons 'box v))
-(define (unbox b) (cdr b))
-(define (set-box! b v) (set-box! b v)) ;fix this somehow, I tried different libraries, different functions
-; set-cdr gives an error which won;t read the rest of the code, set-box! does an infinite loop. I know set-cdr works because I tested
-; it on a minimal example, I need a way to access it or an alternative(I can't find one)
-
-; It doesn't compile right now, if you chnage it to set-box it will but then testing is looped
 
 ; Edited insert, update-in-frame-store, lookup
 
@@ -47,14 +40,7 @@
       ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw next))
       ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw next))
-      ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw next))
-      ((eq? 'funcall (statement-type statement)) (interpret-function-call statement environment return break continue throw next))
       (else (myerror "Unknown statement:" (statement-type statement))))))
-
-; funcall should call an M_value function that:
-; creates the function environment from the current one,
-; evaluate actual params in the current env and bind them to formal params in function,
-; interprets the body of the function with the function env
 
 ; Calls the return continuation with the given expression value
 (define interpret-return
@@ -100,77 +86,6 @@
                                          (lambda (env) (continue (pop-frame env)))
                                          (lambda (v env) (throw v (pop-frame env)))
                                          (lambda (env) (next (pop-frame env))))))
-
-; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
-; and a way to create the function environment from the current one
-
-; function to create env should push a new frame onto the stack and populate it with all variables and functions that were in scope in the previous (global)frame
-; similar to block
-
-
-
-(define copy-environment 
-  (lambda (vars store environment)
-    (cons vars (car (cons store (cdr (push-frame environment)))))))
-
-(define add-parameters
-  (lambda (params environment)
-    (if (null? params)
-        environment
-        (add-parameters (cdr params)(insert (car params) 'novalue environment)))))
-
-(define get-function-environment ;makes function environment from current
-  (lambda (environment params)
-    (if (null? params)
-        (copy-environment (variables environment) (store environment) environment)
-        (add-parameters params (copy-environment (variables environment) (store environment) environment))))) 
-
-; function parse is:  (function fname (formal param list) fbody)
-; ***WIP***
-; Interprets a function definition. ; still figuring out the function to create the function environment
-(define interpret-function
-  (lambda (statement environment next) ;time to test
-    (if (exists-declare-body? statement)
-        (next (insert-function (get-declare-name statement) (get-declare-params statement) (get-declare-body statement) environment))
-        (next (insert-function (get-declare-name statement) 'novalue 'novalue environment)))))
-
-; ***WIP***
-; ***please review this as Im not sure if this is the correct structure***
-; Interprets a function call.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment (not 100% on that for this one)
-(define interpret-function-call
-  (lambda (statement environment return break continue throw next)
-    (letrec
-      [
-        (closure (get-function-environment environment (function-param statement)))
-        (closure-body (lookup-function (function-name statement) environment))
-      ]
-      (interpret-statement-list closure-body
-                                        closure
-                                        (lambda (v) v)
-                                        (lambda (s) (myerror "error: break used outside a loop"))
-                                        (lambda (s) (myerror "error: continue used outside a loop"))
-                                        (lambda (v env) (throw v (pop-frame env)))
-                                        (lambda (env) (next (pop-frame env)))))))
-
-(define function-name operand2)
-(define function-param cddr)
-
-; Helper function for lookup on functions 
-(define lookup-function
-  (lambda (name environment)
-    (let ((body (lookup-in-env name environment)))
-      (if (eq? 'novalue body)
-          (myerror "error: function without a body:" name)
-          body))))
-
-; Return the body bound to a function in the environment
-(define lookup-function-in-env
-  (lambda (name environment)
-    (cond
-      ((null? environment) (myerror "error: undefined function" name))
-      ((exists-in-list? name (variables (topframe environment))) (lookup-in-frame name (topframe environment)))
-      (else (lookup-in-env name (cdr environment))))))
-
 
 ; We use a continuation to throw the proper value.  Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
@@ -290,11 +205,7 @@
 (define get-expr operand1)
 (define get-declare-var operand1)
 (define get-declare-value operand2)
-(define get-declare-name operand1)
-(define get-declare-params operand2)
-(define get-declare-body operand3)
 (define exists-declare-value? exists-operand2?)
-(define exists-declare-body? exists-operand3?)
 (define get-assign-lhs operand1)
 (define get-assign-rhs operand2)
 (define get-condition operand1)
@@ -352,6 +263,7 @@
   (lambda (var l)
     (cond
       ((null? l) #f)
+      ((box? var)(myerror "error: box is cool without an assigned value:" var))
       ((eq? var (car l)) #t)
       (else (exists-in-list? var (cdr l))))))
 
@@ -365,7 +277,7 @@
   (lambda (var environment)
     (let ((value (lookup-in-env var environment)))
       (if (eq? 'novalue value)
-          (myerror "error: variable without an assigned value:" var)  ;may not play nice with adding formal parameters
+          (myerror "error: variable without an assigned value:" var)
           value))))
 
 ; Return the value bound to a variable in the environment
@@ -380,10 +292,13 @@
 (define lookup-in-frame
   (lambda (var frame)
     (cond
-      ((not (exists-in-list? var (variables frame))) (myerror "error: undefined variable" var))
-      ((eq? var (caar frame))  ;added
-            (unbox (cdar frame))    
-            (lookup-in-frame var (cdr frame)))))) ;changed
+      ((null? frame) (myerror (format "error: undefined variable ~a" var)))
+      ((eq? var (caar frame)) 
+       (if (box? (cdar frame)) 
+           (unbox (cdar frame))
+           (myerror (format "error: variable ~a found but its value is not boxed" var))))
+      (else (lookup-in-frame var (cdr frame))))))
+
 
 ; Get the location of a name in a list of names - don't need with box implementation
 (define indexof
@@ -405,15 +320,8 @@
   (lambda (var val environment)
     (if (exists-in-list? var (variables (car environment)))
         (myerror "error: variable is being re-declared:" var)
-        (cons (add-to-frame var (box (scheme->language val)) (car environment)) (cdr environment))))) ;changed to box here
-
-; Adds a new function/closure binding pair into the environment.  Gives an error if the function already exists in this frame.
-(define insert-function
-  (lambda (name params body environment)
-    (if (exists-in-list? name (variables (car environment)))
-        (myerror "error: function is being re-declared:" name)
-        (cons (add-to-frame name (list params body) (car environment)) (cdr environment)))))
-
+         (cons (cons var (box val)) (cdr environment)))))
+  
 ; Changes the binding of a variable to a new value in the environment.  Gives an error if the variable does not exist.
 (define update
   (lambda (var val environment)
@@ -442,8 +350,13 @@
 (define update-in-frame-store
   (lambda (var val varlist vallist)
     (cond
-      ((eq? var (car varlist)) (cons (begin (set-box! (scheme->language val) (car vallist))) (cdr vallist))) ;changed
-      (else (cons (car vallist) (update-in-frame-store var val (cdr varlist) (cdr vallist)))))))
+      ((null? varlist) '())
+      ((eq? var (car varlist)))
+            (cons (cons (car varlist) (begin (set-box! (cdr (car vallist)) (scheme->language val)) (cdr (car vallist))))
+                  (cdr vallist))
+            (cons (car vallist)
+                  (update-in-frame-store var val (cdr varlist) (cdr vallist))))))
+
 
 ; Returns the list of variables from a frame
 (define variables
