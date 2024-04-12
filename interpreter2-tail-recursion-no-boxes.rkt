@@ -7,15 +7,6 @@
 ; The functions that start interpret-...  all return the current environment.  These are the M_state functions.
 ; The functions that start eval-...  all return a value.  These are the M_value and M_boolean functions.
 
-; Define a box data structures
-(define (box v) (cons 'box v))
-(define (unbox b) (cdr b))
-(define (set-box! b v) (set-box! b v)) ;fix this somehow, I tried different libraries, different functions
-; set-cdr gives an error which won;t read the rest of the code, set-box! does an infinite loop. I know set-cdr works because I tested
-; it on a minimal example, I need a way to access it or an alternative(I can't find one)
-
-; It doesn't compile right now, if you chnage it to set-box it will but then testing is looped
-
 ; Edited insert, update-in-frame-store, lookup
 
 ; The main function.  Calls parser to get the parse tree and interprets it with a new environment.  Sets default continuations for return, break, continue, throw, and "next statement"
@@ -352,6 +343,7 @@
   (lambda (var l)
     (cond
       ((null? l) #f)
+      ((box? var)(myerror "error: box is cool without an assigned value:" var))
       ((eq? var (car l)) #t)
       (else (exists-in-list? var (cdr l))))))
 
@@ -380,10 +372,12 @@
 (define lookup-in-frame
   (lambda (var frame)
     (cond
-      ((not (exists-in-list? var (variables frame))) (myerror "error: undefined variable" var))
-      ((eq? var (caar frame))  ;added
-            (unbox (cdar frame))    
-            (lookup-in-frame var (cdr frame)))))) ;changed
+      ((null? frame) (myerror (format "error: undefined variable ~a" var)))
+      ((eq? var (caar frame)) 
+       (if (box? (cdar frame)) 
+           (unbox (cdar frame))
+           (myerror (format "error: variable ~a found but its value is not boxed" var))))
+      (else (lookup-in-frame var (cdr frame))))))
 
 ; Get the location of a name in a list of names - don't need with box implementation
 (define indexof
@@ -405,7 +399,7 @@
   (lambda (var val environment)
     (if (exists-in-list? var (variables (car environment)))
         (myerror "error: variable is being re-declared:" var)
-        (cons (add-to-frame var (box (scheme->language val)) (car environment)) (cdr environment))))) ;changed to box here
+       (cons (cons var (box val)) (cdr environment)))))
 
 ; Adds a new function/closure binding pair into the environment.  Gives an error if the function already exists in this frame.
 (define insert-function
@@ -442,8 +436,12 @@
 (define update-in-frame-store
   (lambda (var val varlist vallist)
     (cond
-      ((eq? var (car varlist)) (cons (begin (set-box! (scheme->language val) (car vallist))) (cdr vallist))) ;changed
-      (else (cons (car vallist) (update-in-frame-store var val (cdr varlist) (cdr vallist)))))))
+      ((null? varlist) '())
+      ((eq? var (car varlist)))
+            (cons (cons (car varlist) (begin (set-box! (cdr (car vallist)) (scheme->language val)) (cdr (car vallist))))
+                  (cdr vallist))
+            (cons (car vallist)
+                  (update-in-frame-store var val (cdr varlist) (cdr vallist))))))
 
 ; Returns the list of variables from a frame
 (define variables
