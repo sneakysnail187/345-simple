@@ -26,6 +26,7 @@
       ((null? statement-list) (next environment)) 
       (else (interpret-statement (car statement-list) environment return break continue throw (lambda (env) (interpret-statement-list (cdr statement-list) env return break continue throw next)))))))
 
+;(((main) ((() ((var x 10) (var y 20) (var z 30) (var min 0) (if (< x y) (= min x) (= min y)) (if (> min z) (= min z)) (return min))))))
 ; interpret a statement in the environment with continuations for return, break, continue, throw, and "next statement"
 (define interpret-statement
   (lambda (statement environment return break continue throw next)
@@ -119,6 +120,7 @@
 ; function parse is:  (function fname (formal param list) fbody)
 ; ***WIP***
 ; Interprets a function definition. ; still figuring out the function to create the function environment
+
 (define interpret-function
   (lambda (statement environment next) ;time to test
     (if (exists-declare-body? statement)
@@ -293,7 +295,7 @@
 (define get-try operand1)
 (define get-catch operand2)
 (define get-finally operand3)
-(define function-name operand2)
+(define function-name operand1)
 (define function-param cddr)
 
 (define catch-var
@@ -405,7 +407,7 @@
   (lambda (name params body environment)
     (if (exists-in-list? name (variables (car environment)))
         (myerror "error: function is being re-declared:" name)
-        (cons (add-to-frame name (list params body) (car environment)) (cdr environment)))))
+        (add-to-frame name (list params body) (topframe environment)))))
 
 ; Changes the binding of a variable to a new value in the environment.  Gives an error if the variable does not exist.
 (define update
