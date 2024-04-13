@@ -138,7 +138,7 @@
         (closure (get-function-environment environment (function-param statement)))
         (closure-body (lookup-function (function-name statement) environment))
       ]
-      (interpret-statement-list closure-body
+      (interpret-statement-list (cadr closure-body)
                                         closure
                                         (lambda (v) v)
                                         (lambda (s) (myerror "error: break used outside a loop"))
@@ -346,7 +346,8 @@
     (cond
       ((null? l) #f)
       ((box? var)(myerror "error: box is cool without an assigned value:" var))
-      ((or (eq? var l) (eq? var (car l))) #t)
+      ((eq? var l) #t)
+      ((eq? var (car l)) #t)
       (else (exists-in-list? var (cdr l))))))
 
 ; Looks up a value in the environment.  If the value is a boolean, it converts our languages boolean type to a Scheme boolean type
