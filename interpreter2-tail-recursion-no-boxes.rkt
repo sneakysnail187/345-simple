@@ -22,8 +22,8 @@
   (lambda (statement-list environment return break continue throw next)
     (cond
       ((and (exists-in-list? 'main (variables environment))(null? statement-list))
-       (interpret-statement-list (lookup-function 'main environment) environment return break continue throw next))
-      ((null? statement-list) (next environment)) ; if environment contains main and reaches the end then run main else keep previous behavior
+       (interpret-function-call '(funcall main) environment return break continue throw next))
+      ((null? statement-list) (next environment)) 
       (else (interpret-statement (car statement-list) environment return break continue throw (lambda (env) (interpret-statement-list (cdr statement-list) env return break continue throw next)))))))
 
 ; interpret a statement in the environment with continuations for return, break, continue, throw, and "next statement"
@@ -40,7 +40,7 @@
       ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw next))
       ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw next))
-      ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw next))
+      ((eq? 'function (statement-type statement)) (interpret-function statement environment next))
       ((eq? 'funcall (statement-type statement)) (interpret-function-call statement environment return break continue throw next))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 

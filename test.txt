@@ -1,14 +1,14 @@
-<<<<<<< Updated upstream
-var x = 10;
-var y = 12 + x;
-return x * y;
-=======
-var x = 100 % 2 == 0;
-var y = 10 >= 20;
-var z;
-if (x || y)
-  z = y;
-else
-  z = x;
-return z;
->>>>>>> Stashed changes
+function main() {
+  var x = 10;
+  var y = 20;
+  var z = 30;
+  var min = 0;
+
+  if (x < y)
+    min = x;
+  else
+    min = y;
+  if (min > z)
+    min = z;
+  return min;
+}
