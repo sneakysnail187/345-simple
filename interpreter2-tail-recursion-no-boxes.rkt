@@ -1,6 +1,5 @@
 #lang racket
 (require "functionParser.rkt")
-; (load "simpleParser.scm")
 
 ; An interpreter for the simple language using tail recursion for the M_state functions and does not handle side effects.
 
@@ -26,11 +25,13 @@
       ((null? statement-list) (next environment)) 
       (else (interpret-statement (car statement-list) environment return break continue throw (lambda (env) (interpret-statement-list (cdr statement-list) env return break continue throw next)))))))
 
+;if statement is null and env contains main then run it
 ;(((main) ((() ((var x 10) (var y 20) (var z 30) (var min 0) (if (< x y) (= min x) (= min y)) (if (> min z) (= min z)) (return min))))))
 ; interpret a statement in the environment with continuations for return, break, continue, throw, and "next statement"
 (define interpret-statement
   (lambda (statement environment return break continue throw next)
     (cond
+      ((and (exists-in-list? 'main (topframe environment))(null? statement))(interpret-function-call '(funcall main) environment return break continue throw next))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment next))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment next))
@@ -148,7 +149,7 @@
 ; Helper function for lookup on functions 
 (define lookup-function
   (lambda (name environment)
-    (let ((body (lookup-in-env name environment)))
+    (let ((body (lookup-function-in-env name environment)))
       (if (eq? 'novalue body)
           (myerror "error: function without a body:" name)
           body))))
@@ -158,8 +159,8 @@
   (lambda (name environment)
     (cond
       ((null? environment) (myerror "error: undefined function" name))
-      ((exists-in-list? name (variables (topframe environment))) (lookup-in-frame name (topframe environment)))
-      (else (lookup-in-env name (cdr environment))))))
+      ((exists-in-list? name (variables (topframe environment))) (lookup-function-in-frame name environment))
+      (else (lookup-function-in-env name (cdr environment))))))
 
 
 ; We use a continuation to throw the proper value.  Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
@@ -345,7 +346,7 @@
     (cond
       ((null? l) #f)
       ((box? var)(myerror "error: box is cool without an assigned value:" var))
-      ((eq? var (car l)) #t)
+      ((or (eq? var l) (eq? var (car l))) #t)
       (else (exists-in-list? var (cdr l))))))
 
 ; Looks up a value in the environment.  If the value is a boolean, it converts our languages boolean type to a Scheme boolean type
@@ -366,7 +367,7 @@
   (lambda (var environment)
     (cond
       ((null? environment) (myerror "error: undefined variable" var))
-      ((exists-in-list? var (variables (topframe environment))) (lookup-in-frame var (topframe environment)))
+      ((exists-in-list? var (variables (topframe environment))) (lookup-in-frame var environment))
       (else (lookup-in-env var (cdr environment))))))
 
 ; Return the value bound to a variable in the frame
@@ -379,6 +380,17 @@
            (unbox (cdar frame))
            (myerror (format "error: variable ~a found but its value is not boxed" var))))
       (else (lookup-in-frame var (cdr frame))))))
+
+; Return the body bound to a function in the frame
+(define lookup-function-in-frame
+  (lambda (name frame)
+    (cond
+      ((null? frame) (myerror (format "error: undefined function ~a" name)))
+      ((eq? name (caar frame)) 
+       (if (box? (caadr frame)) 
+           (unbox (caadr frame))
+           (myerror (format "error: variable ~a found but its value is not boxed" name))))
+      (else (lookup-function-in-frame name (cdr frame))))))
 
 ; Get the location of a name in a list of names - don't need with box implementation
 (define indexof
@@ -419,7 +431,7 @@
 ; Add a new variable/value pair to the frame.
 (define add-to-frame
   (lambda (var val frame)
-    (list (cons var (variables frame)) (cons (scheme->language val) (store frame)))))
+    (list (cons var (variables frame)) (cons (box (scheme->language val)) (store frame)))))
 
 ; Changes the binding of a variable in the environment to a new value
 (define update-existing
