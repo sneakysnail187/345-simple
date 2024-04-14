@@ -102,9 +102,9 @@
 ; function to create env should push a new frame onto the stack and populate it with all variables and functions that were in scope in the previous (global)frame
 ; similar to block
 
-(define copy-environment 
+(define copy-environment
   (lambda (vars store environment)
-    (cons vars (car (cons store (cdr (push-frame environment)))))))
+    (push-frame (cons vars store) environment)))
 
 (define add-parameters
   (lambda (params environment)
@@ -320,8 +320,8 @@
 
 ; add a frame onto the top of the environment
 (define push-frame
-  (lambda (environment)
-    (cons (newframe) environment)))
+  (lambda (new-frame environment)
+    (cons new-frame environment)))
 
 ; remove a frame from the environment
 (define pop-frame
@@ -495,4 +495,3 @@
                             str
                             (makestr (string-append str (string-append " " (symbol->string (car vals)))) (cdr vals))))))
       (error-break (display (string-append str (makestr "" vals)))))))
-
