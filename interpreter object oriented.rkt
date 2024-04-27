@@ -44,6 +44,7 @@
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw next))
       ((eq? 'function (statement-type statement)) (interpret-function statement environment next))
       ((eq? 'funcall (statement-type statement)) (interpret-function-call statement environment return break continue throw next))
+      ((eq? 'class (statement-type statement)) (interpret-class (cdr statement) environment)) ;add abstraction later
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
 ; funcall should call an M_value function that:
@@ -95,6 +96,43 @@
                                          (lambda (env) (continue (pop-frame env)))
                                          (lambda (v env) (throw v (pop-frame env)))
                                          (lambda (env) (next (pop-frame env))))))
+
+; Interprets a class, adding it to the current environment
+(define interpret-class
+  (lambda (closure environment)
+    (cond
+      ((null? closure) (myerror "No closure provided"))
+      (else (insert (class-name closure) (class-closure-body closure) environment)))))
+
+(define class-name car)
+(define class-closure-body car)
+                 
+(define interpret-new-class-object
+  (lambda (statement environment return break continue throw)
+    (cond
+      ((null? statement) (myerror "No statement provided"))
+      ((null? (lookup (object-class-name statement) environment)) (myerror "Referenced class ~a not found" (object-class-name statement)))
+      (else (insert (class-name statement) (make-state-from-instance (object-class-closure (lookup (object-class-name statement) environment)) (newenvironment) return break continue throw) environment)))))
+      
+(define object-name car)
+(define object-class-name cadadr)
+(define object-class-closure cadr)
+
+
+
+
+
+; Parse through provided class closure 
+; Makes a state layer from encountered instance fields and functions
+; Interpret each statement within the closure along the way
+(define make-state-from-instance
+  (lambda (closure environment return break continue throw) ;might make this an if statement also add abstraction to this
+    (cond
+      ((null? closure) environment)
+      ((list? (car closure)) (make-state-from-instance (cdr closure) (interpret-statement (car closure) environment return break continue throw))))))
+
+
+
 
 ; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
 ; and a way to create the function environment from the current one
@@ -162,6 +200,13 @@
       ((exists-in-list? name (variables (topframe environment))) (lookup-function-in-frame name environment))
       (else (lookup-function-in-env name (cdr environment))))))
 
+; Return found function body from provided class closure
+(define lookup-function-in-closure  
+  (lambda (closure fname)
+    (cond
+      ((null? closure) (myerror "Function ~a not found in class closure" fname)) ;add abstraction
+      ((eq? fname (cadar closure)) (cddar closure))
+      (else (lookup-function-in-closure (cdr closure) fname)))))
 
 ; We use a continuation to throw the proper value.  Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
@@ -375,12 +420,8 @@
 (define lookup-in-frame
   (lambda (var frame)
     (cond
-      ((null? frame) (myerror (format "error: undefined variable ~a" var)))
-      ((eq? var (caar frame)) 
-       (if (box? (cdar frame)) 
-           (unbox (cdar frame))
-           (myerror (format "error: variable ~a found but its value is not boxed" var))))
-      (else (lookup-in-frame var (cdr frame))))))
+      ((nor (exists-in-list? var (variables frame))(null? frame)) (myerror (format "error: undefined variable ~a" var)))
+      (else (language->scheme (get-value (indexof var (variables frame)) (store frame)))))))
 
 ; Return the body bound to a function in the frame
 (define lookup-function-in-frame
@@ -413,7 +454,7 @@
   (lambda (var val environment)
     (if (exists-in-list? var (variables (car environment)))
         (myerror "error: variable is being re-declared:" var)
-       (cons (cons var (box val)) (cdr environment)))))
+        (cons (add-to-frame var (box val)) (cdr environment)))))
 
 ; Adds a new function/closure binding pair into the environment.  Gives an error if the function already exists in this frame.
 (define insert-function
