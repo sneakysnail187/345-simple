@@ -2,21 +2,20 @@
 #lang racket
 (provide (all-defined-out))
 
-; A simple parser for a Java/C-ish language minus the objects
+; A simple parser for a Java style language
 ; EECS 345: Programming Languages Concepts
 ;
 ; A recursive descent parser and a lexical analyzer for simple Java statements.
 ; The language allows assignments, all mathematical expressions, if statements,
-; while statements (including break and continue), blocks, and functions.
-;
-; Also include throwing and catching exceptions and nested functions.
+; while statements (including break and continue), blocks, functions, objects, 
+; and exceptions.
 ;
 ; To call the parser, use:
 ;     (parser filename)
 ;
 ; The return value is a parse tree in list format
 
-;(load "lex.scm")
+; (load "lex.scm")
 (require "lex.rkt")
 
 (define parser
@@ -35,38 +34,127 @@
        '()
        (begin
          (unget-next-symbol)
-         (let ((parsetree (top-level-parse)))
+         (let ((parsetree (class-parse)))
            (cons parsetree (program-parse)))))))
 
-; parse the top level of the program.  The top level is a function definition (an identifier followed by a left
-; parenthesis) or is an assignment statement.
+; a program is made up of classes.  Each class should be a name, the class that is extended,
+; and a body nested in braces
+
+(define class-parse
+  (lambda ()
+    (if (not (eq? (car (get-next-symbol)) 'class))
+        (error 'parser "Illegal start of class")
+        (let* ((classname (get-next-symbol))
+               (extendclass (extend-parse)))
+          (if (not (eq? (car classname) 'ID))
+              (error 'parser "Illegal class name")
+              (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
+                  (error 'parser "Missing left brace at start of class")
+                  (list 'class (cdr classname) extendclass (class-body-parse (cdr classname)))))))))
+
+; parse the extends statement on a class, if it exists
+
+(define extend-parse
+  (lambda ()
+    (if (not (eq? (car (get-next-symbol)) 'extends))
+        (begin
+          (unget-next-symbol)
+          '()
+          )
+        (let ((extendclass (get-next-symbol)))
+          (if (not (eq? (car extendclass) 'ID))
+              (error 'parser "Illegal superclass name")
+              (list 'extends (cdr extendclass)))))))
+
+; parse the body of a class.  The body is assignment statements and method definitions.
+
+(define class-body-parse
+  (lambda (classname)
+    (if (eq? (car (get-next-symbol)) 'RIGHTBRACE)
+       '()
+       (begin
+         (unget-next-symbol)
+         (let ((parsetree (top-level-parse classname)))
+           (cons parsetree (class-body-parse classname)))))))
+
+; parse the top level of a class.  The top level is a function definition (an identifier followed by a left
+; parenthesis) or is a variable declaration.  Functions and variables can be static (class) or non-static (instance).
 
 (define top-level-parse
-  (lambda ()
+  (lambda (classname)
+    (let ((firstsymbol (get-next-symbol)))
+      (if (eq? (car firstsymbol) 'static)
+          (top-statement-parse classname #t)
+          (begin
+            (unget-next-symbol)
+            (top-statement-parse classname #f))))))
+
+; detect if the statement in a class definition is a variable declaration or a function definition.
+
+(define top-statement-parse
+  (lambda (classname static)
     (let ((firstsymbol (get-next-symbol)))
       (cond
-        ((eq? (car firstsymbol) 'function) (function-parse))
+        ((eq? (car firstsymbol) 'function) (top-function-parse static))
         ((eq? (car firstsymbol) 'var)
             (let ((parse-statement '()))
               (begin 
-                (set! parse-statement (declare-parse))
+                (set! parse-statement (top-declare-parse static))
                 (if (eq? (car (get-next-symbol)) 'SEMICOLON)
                     parse-statement
                     (error 'parser "Missing semicolon")))))
-        (else (error 'parser "Illegal start of top level statement"))))))
+        ((eq? (car firstsymbol) 'ID)
+           (cond
+	      ((not (equal? (cdr firstsymbol) classname)) (error 'parser "Illegal language structure or constructor with different name as class"))
+	      ((not (eq? (car (get-next-symbol)) 'LEFTPAREN)) (error 'parser "Illegal start of constructor definition"))
+              (static (error 'parser "Constructor can not be static"))
+	      (else (constructor-parse)))) 
+        (else (error 'parser "Illegal start of function definition or variable declaration"))))))
+
+; calls function-parse to parse a function name.  It is a static function, replaces the operator
+; at the start of the returned expression with 'static-function
+
+(define top-function-parse
+  (lambda (static)
+    (let ((function-def (function-parse #t)))
+      (if static
+          (if (eq? 'abstract-function (car function-def))
+              (error 'parser "Static functions cannot be abstract")
+              (cons 'static-function (cdr function-def)))
+          function-def))))
+
+; calls declare-parse to parse a variable declaration.  If it is a static variable, replaces the 
+; operator at the start of the returned expression with 'static-var
+
+(define top-declare-parse
+  (lambda (static)
+    (if static
+        (cons 'static-var (cdr (declare-parse)))
+        (declare-parse))))
 
 ; parse a function. A function is the name, followed by a formal parameter list, 
 ; followed by the body nested in braces
 
 (define function-parse
-  (lambda ()
+  (lambda (toplevel)
     (let ((name (get-next-symbol)))
-      (if (and (eq? (car name) 'ID) (eq? (car (get-next-symbol)) 'LEFTPAREN))
-          (let ((paramlist (get-formalparameter-list)))
-            (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
-                (error 'parser "Missing left brace")
-                (list 'function (cdr name) paramlist (compound-statement-parse))))
-          (error "Illegal start of function definition")))))
+       (if (and (eq? (car name) 'ID) (eq? (car (get-next-symbol)) 'LEFTPAREN))
+           (let* ((paramlist (get-formalparameter-list))
+                  (nextsymbol (car (get-next-symbol))))
+              (if (not (eq? nextsymbol 'LEFTBRACE))
+                  (if (and (eq? nextsymbol 'SEMICOLON) toplevel)
+                      (list 'abstract-function (cdr name) paramlist)
+                      (error 'parser "Missing left brace"))
+                  (list 'function (cdr name) paramlist (compound-statement-parse))))
+           (error "Illegal start of function definition")))))
+
+; parse a constructor.  Very similar to a function parse but uses "constructor" instead of "function name" as the header
+(define constructor-parse
+  (lambda ()
+    (let ((paramlist (get-formalparameter-list)))
+       (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
+           (error 'parser "Missing left brace")
+           (list 'constructor paramlist (compound-statement-parse))))))
 
 ; parse the formal parameter list.  The list is a sequence of identifiers separated by commas
 
@@ -101,8 +189,8 @@
       (cond
         ((eq? nextsymbol 'if) (if-parse))
         ((eq? nextsymbol 'while) (while-parse))
+	((eq? nextsymbol 'function) (function-parse #f))
         ((eq? nextsymbol 'try) (try-parse))
-        ((eq? nextsymbol 'function) (function-parse))
         ((eq? nextsymbol 'LEFTBRACE) (cons 'begin (compound-statement-parse)))
         (else (begin
                 (unget-next-symbol)
@@ -120,8 +208,8 @@
               ((eq? (car nextsymbol) 'break) (set! parse-statement (list 'break)))
               ((eq? (car nextsymbol) 'continue) (set! parse-statement (list 'continue)))
               ((eq? (car nextsymbol) 'throw) (set! parse-statement (list 'throw (value-parse))))
-              ((eq? (car nextsymbol) 'ID) (set! parse-statement (id-parse nextsymbol)))
-              (else (set! parse-statement (assign-parse nextsymbol))))
+              ((eq? (car nextsymbol) 'ID) (begin (unget-next-symbol) (set! parse-statement (function-or-assign-parse))))
+              (else (error 'parse "language feature not implemented")))
          (if (eq? (car (get-next-symbol)) 'SEMICOLON)
              parse-statement
              (error 'parser "Missing semicolon"))))))
@@ -159,6 +247,53 @@
                         (unget-next-symbol)
                         (list 'if condition if-statement)))))))))
 
+; parse a try block.  The try block is a compound statement followed by catch block and/or
+; a finally block
+
+(define try-parse
+  (lambda ()
+    (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
+        (error 'parser "Left brace expected")
+        (let* ((tryblock (compound-statement-parse))
+               (catchblock (catch-parse))
+               (finallyblock (finally-parse)))
+          (if (and (null? catchblock) (null? finallyblock))
+              (error 'parser "try without catch of finally")
+              (list 'try tryblock catchblock finallyblock))))))
+
+; parse a catch block.  The catch block must contain a variable (the exception) inside
+; parentheses and then a block of code.
+
+(define catch-parse
+  (lambda ()
+    (let ((nextsymbol (car (get-next-symbol))))
+      (if (not (eq? nextsymbol 'catch))
+          (begin
+            (unget-next-symbol)
+            '())
+          (let* ((firstsymbol (get-next-symbol))
+                 (secondsymbol (get-next-symbol))
+                 (thirdsymbol (get-next-symbol))
+                 (fourthsymbol (get-next-symbol)))
+            (cond ((not (eq? (car firstsymbol) 'LEFTPAREN)) (error 'parser "Missing left parenthesis"))
+                  ((not (eq? (car secondsymbol) 'ID)) (error 'parser "Missing exception parameter"))
+                  ((not (eq? (car thirdsymbol) 'RIGHTPAREN)) (error 'parser "Missing closing parenthesis"))
+                  ((not (eq? (car fourthsymbol) 'LEFTBRACE)) (error 'parser "Missing opening brace"))
+                  (else (list 'catch (list (cdr secondsymbol)) (compound-statement-parse)))))))))
+
+; parse a finally block.  A finally block is a compound statement that starts with "finally"
+
+(define finally-parse
+  (lambda ()
+    (let ((nextsymbol (get-next-symbol)))
+      (if (not (eq? (car nextsymbol) 'finally))
+          (begin
+            (unget-next-symbol)
+            '())
+          (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
+              (error 'parser "Missing opening parenthesis")
+              (list 'finally (compound-statement-parse)))))))
+
 ; parse a while statement: a condition followed by a statement
 
 (define while-parse
@@ -170,18 +305,31 @@
               (error 'parser "Missing closing parenthesis")
               (list 'while condition (statement-parse)))))))
 
-; parse an identifier.  It could be a function call or the start of an assignment statement
+; parse either a function or an assignment statement.  Parse the left hand side.  If it is
+; a function call return it.  Otherwise, assume it is a variable and this is an assignment
+; statement
+
+(define function-or-assign-parse
+  (lambda ()
+    (let ((id (id-parse (variable-parse (get-next-symbol)))))
+      (if (and (pair? id) (eq? (car id) 'funcall))
+          id
+          (assign-parse id)))))
+
+; parse an id in an expression or statement.  The id can be a variable, a function call,
+; or a combination using the dot operator.  This function keeps nesting varaibles and
+; functions with the dot operator until we get something other than a dot or a parenthesis.
 
 (define id-parse
-  (lambda (firstsymbol)
-    (if (not (eq? (car firstsymbol) 'ID))
-        (error 'parser "Illegal start of statement")
-        (let ((secondsymbol (get-next-symbol)))
-          (if (eq? (car secondsymbol) 'LEFTPAREN)
-              (funcall-parse (cdr firstsymbol))
-              (begin
+  (lambda (leftvalue)
+    (let ((nextsymbol (get-next-symbol)))
+      (cond
+        ((eq? (car nextsymbol) 'LEFTPAREN) (id-parse (funcall-parse leftvalue)))
+        ((and (eq? (car nextsymbol) 'BINARY-OP) (eq? (cdr nextsymbol) 'dot))
+           (id-parse (list 'dot leftvalue (variable-parse (get-next-symbol)))))
+        (else (begin
                 (unget-next-symbol)
-                (assign-parse firstsymbol)))))))
+                leftvalue))))))
 
 ; parse a function call: an identifier followed by a parameter list
 
@@ -221,11 +369,10 @@
 ; parse an assignment statement: a left-hand-side followed by an = followed by a value
 
 (define assign-parse
-  (lambda (firstsymbol)
-    (let* ((lhs (lhs-parse firstsymbol))
-           (op (get-next-symbol)))
+  (lambda (lhs)
+    (let ((op (get-next-symbol)))
       (if (and (eq? (car op) 'BINARY-OP) (eq? (cdr op) '=))
-          (append (cons (cdr op) lhs) (list (value-parse)))
+          (append (list (cdr op) lhs) (list (value-parse)))
           (error 'parser "Unknown assignment operator")))))
 
 ; parse the left hand side of an assignment.  Only variables are allowed.
@@ -240,13 +387,31 @@
 
 (define value-parse
   (lambda ()
-    (let* ((lhs (get-next-symbol))
-           (op (get-next-symbol)))
-      (if (and (eq? (car lhs) 'ID) (eq? (car op) 'BINARY-OP) (eq? (cdr op) '=))
-          (list (cdr op) (cdr lhs) (value-parse))
+    (assignterm-parse (get-next-symbol))))
+;    (let* ((lhs (get-next-symbol))
+;           (op (get-next-symbol)))
+;      (if (and (eq? (car lhs) 'ID) (eq? (car op) 'BINARY-OP) (eq? (cdr op) '=))
+;          (list (cdr op) (cdr lhs) (value-parse))
+;          (begin
+;            (unget-next-symbol)
+;            (orterm-parse lhs))))))
+
+; Parsing the value.  The top level is the assign operator
+
+(define assignterm-parse
+  (lambda (firstsymbol)
+    (assignterm-parse-helper (orterm-parse firstsymbol))))
+
+; parse the assign expression.
+
+(define assignterm-parse-helper
+  (lambda (firstoperand)
+    (let ((op (get-next-symbol)))
+      (if (and (eq? (car op) 'BINARY-OP) (eq? (cdr op) '=))
+          (assignterm-parse-helper (list '= firstoperand (assignterm-parse (get-next-symbol))))
           (begin
             (unget-next-symbol)
-            (orterm-parse lhs))))))
+            firstoperand)))))
 
 ; continuing parsing the value.  The second level is the OR operator
 
@@ -363,61 +528,19 @@
       ((and (eq? (car firstsymbol) 'BINARY-OP) (eq? (cdr firstsymbol) '-)) (list '- (operand-parse (get-next-symbol))))  ; this is a new line
       ((and (eq? (car firstsymbol) 'BINARY-OP) (eq? (cdr firstsymbol) '!)) (list '! (operand-parse (get-next-symbol))))  ; this is a new line
       ((eq? (car firstsymbol) 'NUMBER) (cdr firstsymbol))
-      ((eq? (car firstsymbol) 'ID)
-             (let ((secondsymbol (get-next-symbol)))
-               (if (eq? (car secondsymbol) 'LEFTPAREN)
-                   (funcall-parse (cdr firstsymbol))
-                   (begin
-                     (unget-next-symbol)
-                     (cdr firstsymbol)))))
+      ((eq? (car firstsymbol) 'ID) (id-parse (variable-parse firstsymbol)))
       ((eq? (car firstsymbol) 'BOOLEAN) (cdr firstsymbol))
+      ((eq? (car firstsymbol) 'new) (let* ((classid (get-next-symbol))
+                                           (nextsymbol (get-next-symbol)))
+                                      (cond ((not (eq? (car classid) 'ID)) (error 'parser "Illegal class name in new"))
+                                            ((not (eq? (car nextsymbol) 'LEFTPAREN)) (error 'parser "Missing left parenthesis"))
+                                            (else (id-parse (cons 'new (cdr (funcall-parse (cdr classid)))))))))
       (else (error 'parser "Unknown statmement")))));)
 
+; parse a variable name.
 
-; parse a try block.  The try block is a compound statement followed by catch block and/or
-; a finally block
-
-(define try-parse
-  (lambda ()
-    (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
-        (error 'parser "Left brace expected")
-        (let* ((tryblock (compound-statement-parse))
-               (catchblock (catch-parse))
-               (finallyblock (finally-parse)))
-          (if (and (null? catchblock) (null? finallyblock))
-              (error 'parser "try without catch of finally")
-              (list 'try tryblock catchblock finallyblock))))))
-
-; parse a catch block.  The catch block must contain a variable (the exception) inside
-; parentheses and then a block of code.
-
-(define catch-parse
-  (lambda ()
-    (let ((nextsymbol (car (get-next-symbol))))
-      (if (not (eq? nextsymbol 'catch))
-          (begin
-            (unget-next-symbol)
-            '())
-          (let* ((firstsymbol (get-next-symbol))
-                 (secondsymbol (get-next-symbol))
-                 (thirdsymbol (get-next-symbol))
-                 (fourthsymbol (get-next-symbol)))
-            (cond ((not (eq? (car firstsymbol) 'LEFTPAREN)) (error 'parser "Missing left parenthesis"))
-                  ((not (eq? (car secondsymbol) 'ID)) (error 'parser "Missing exception parameter"))
-                  ((not (eq? (car thirdsymbol) 'RIGHTPAREN)) (error 'parser "Missing closing parenthesis"))
-                  ((not (eq? (car fourthsymbol) 'LEFTBRACE)) (error 'parser "Missing opening brace"))
-                  (else (list 'catch (list (cdr secondsymbol)) (compound-statement-parse)))))))))
-
-; parse a finally block.  A finally block is a compound statement that starts with "finally"
-
-(define finally-parse
-  (lambda ()
-    (let ((nextsymbol (get-next-symbol)))
-      (if (not (eq? (car nextsymbol) 'finally))
-          (begin
-            (unget-next-symbol)
-            '())
-          (if (not (eq? (car (get-next-symbol)) 'LEFTBRACE))
-              (error 'parser "Missing opening parenthesis")
-              (list 'finally (compound-statement-parse)))))))
-
+(define variable-parse
+  (lambda (idsymbol)
+    (if (not (eq? (car idsymbol) 'ID))
+        (error 'parser "Identifier expected")
+        (cdr idsymbol))))
