@@ -10,20 +10,19 @@
 
 ; The main function.  Calls parser to get the parse tree and interprets it with a new environment.  Sets default continuations for return, break, continue, throw, and "next statement"
 (define interpret
-  (lambda (file)
+  (lambda (file classname)
     (scheme->language
-     (interpret-statement-list (parser file) (newenvironment) (lambda (v) v)
+     (interpret-statement-list (parser file) classname (newenvironment) (lambda (v) v)
                                (lambda (env) (myerror "Break used outside of loop")) (lambda (env) (myerror "Continue used outside of loop"))
                                (lambda (v env) (myerror "Uncaught exception thrown")) (lambda (env) env)))))
 
 ; interprets a list of statements.  The state/environment from each statement is used for the next ones.
 (define interpret-statement-list
-  (lambda (statement-list environment return break continue throw next)
-    (cond
-      ((and (exists-in-list? 'main (variables environment))(null? statement-list))
-       (interpret-function-call '(funcall main) environment return break continue throw next))
-      ((null? statement-list) (next environment)) 
-      (else (interpret-statement (car statement-list) environment return break continue throw (lambda (env) (interpret-statement-list (cdr statement-list) env return break continue throw next)))))))
+  (lambda (statement-list classname environment return break continue throw next)
+    (if (null? statement-list)
+        (evaluate-main classname environment return break continue throw next)
+        (interpret-statement (car statement-list) environment return break continue throw
+                             (lambda (env) (interpret-statement-list (cdr statement-list) classname env return break continue throw next))))))
 
 ;if statement is null and env contains main then run it
 ;(((main) ((() ((var x 10) (var y 20) (var z 30) (var min 0) (if (< x y) (= min x) (= min y)) (if (> min z) (= min z)) (return min))))))
@@ -31,7 +30,6 @@
 (define interpret-statement
   (lambda (statement environment return break continue throw next)
     (cond
-      ((and (exists-in-list? 'main (topframe environment))(null? statement))(interpret-function-call '(funcall main) environment return break continue throw next))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment next))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment next))
@@ -44,6 +42,7 @@
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw next))
       ((eq? 'function (statement-type statement)) (interpret-function statement environment next))
       ((eq? 'funcall (statement-type statement)) (interpret-function-call statement environment return break continue throw next))
+      ((eq? 'new (statement-type statement)) (interpret-new-class-object (cdr statement) environment return break continue throw))
       ((eq? 'class (statement-type statement)) (interpret-class (cdr statement) environment)) ;add abstraction later
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
@@ -89,13 +88,20 @@
 ; Interprets a block.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment
 (define interpret-block
   (lambda (statement environment return break continue throw next)
-    (interpret-statement-list (cdr statement)
+    (pop-frame (interpret-block-list (cdr statement)
                                          (push-frame environment)
                                          return
                                          (lambda (env) (break (pop-frame env)))
                                          (lambda (env) (continue (pop-frame env)))
                                          (lambda (v env) (throw v (pop-frame env)))
-                                         (lambda (env) (next (pop-frame env))))))
+                                         (lambda (env) (next (pop-frame env)))))))
+
+;Helper function for interpreting block staatements
+(define interpret-block-list
+  (lambda (statement-list environment return break continue throw next)
+    (if (null? statement-list)
+        environment
+        (interpret-block-list (cdr statement-list) (interpret-statement (cdr statement-list) environment return break continue throw next) return break continue throw next))))
 
 ; Interprets a class, adding it to the current environment
 (define interpret-class
@@ -106,7 +112,8 @@
 
 (define class-name car)
 (define class-closure-body car)
-                 
+
+; Interprets a class type object and adds it to the environment
 (define interpret-new-class-object
   (lambda (statement environment return break continue throw)
     (cond
@@ -117,9 +124,6 @@
 (define object-name car)
 (define object-class-name cadadr)
 (define object-class-closure cadr)
-
-
-
 
 
 ; Parse through provided class closure 
@@ -174,7 +178,7 @@
     (letrec
       [
         (closure (get-function-environment environment (function-param statement)))
-        (closure-body (lookup-function (function-name statement) environment))
+        (closure-body (lookup (function-name statement) environment))
       ]
       (interpret-statement-list (cadr closure-body)
                                         closure
@@ -185,20 +189,20 @@
                                         (lambda (env) (next (pop-frame env)))))))
 
 ; Helper function for lookup on functions 
-(define lookup-function
-  (lambda (name environment)
-    (let ((body (lookup-function-in-env name environment)))
-      (if (eq? 'novalue body)
-          (myerror "error: function without a body:" name)
-          body))))
+;(define lookup-function
+ ; (lambda (name environment)
+  ;  (let ((body (lookup-function-in-env name environment)))
+   ;   (if (eq? 'novalue body)
+    ;      (myerror "error: function without a body:" name)
+     ;     body))))
 
 ; Return the body bound to a function in the environment
-(define lookup-function-in-env
-  (lambda (name environment)
-    (cond
-      ((null? environment) (myerror "error: undefined function" name))
-      ((exists-in-list? name (variables (topframe environment))) (lookup-function-in-frame name environment))
-      (else (lookup-function-in-env name (cdr environment))))))
+;(define lookup-function-in-env
+ ; (lambda (name environment)
+  ;  (cond
+   ;   ((null? environment) (myerror "error: undefined function" name))
+    ;  ((exists-in-list? name (variables (topframe environment))) (lookup-function-in-frame name environment))
+     ; (else (lookup-function-in-env name (cdr environment))))))
 
 ; Return found function body from provided class closure
 (define lookup-function-in-closure  
@@ -295,6 +299,18 @@
       ((eq? '&& (operator expr)) (and op1value (eval-expression (operand2 expr) environment)))
       (else (myerror "Unknown operator:" (operator expr))))))
 
+(define statement-list-of-function cadr)
+
+(define evaluate-main
+  (lambda (classname environment return break continue throw)
+    (cond
+      ((not (exists? classname environment)) (myerror "No main function found"))
+      (else (interpret-statement-list (statement-list-of-function (lookup-function-in-closure (cadr (lookup classname environment)) 'main)) classname
+                                      (make-state-from-instance (cadr (lookup classname environment))(push-frame environment) return break continue throw)
+                                      return break continue throw)))))
+
+
+; make-state-from-instance
 ; Determines if two values are equal.  We need a special test because there are both boolean and integer types.
 (define isequal
   (lambda (val1 val2)
@@ -390,8 +406,6 @@
   (lambda (var l)
     (cond
       ((null? l) #f)
-      ((box? var)(myerror "error: box is cool without an assigned value:" var))
-      ((eq? var l) #t)
       ((eq? var (car l)) #t)
       (else (exists-in-list? var (cdr l))))))
 
@@ -424,15 +438,15 @@
       (else (language->scheme (get-value (indexof var (variables frame)) (store frame)))))))
 
 ; Return the body bound to a function in the frame
-(define lookup-function-in-frame
-  (lambda (name frame)
-    (cond
-      ((null? frame) (myerror (format "error: undefined function ~a" name)))
-      ((eq? name (caar frame)) 
-       (if (box? (caadr frame)) 
-           (unbox (caadr frame))
-           (myerror (format "error: variable ~a found but its value is not boxed" name))))
-      (else (lookup-function-in-frame name (cdr frame))))))
+;(define lookup-function-in-frame
+ ; (lambda (name frame)
+  ;  (cond
+   ;   ((null? frame) (myerror (format "error: undefined function ~a" name)))
+    ;  ((eq? name (caar frame)) 
+     ;  (if (box? (caadr frame)) 
+      ;     (unbox (caadr frame))
+       ;    (myerror (format "error: variable ~a found but its value is not boxed" name))))
+      ;(else (lookup-function-in-frame name (cdr frame))))))
 
 ; Get the location of a name in a list of names - don't need with box implementation
 (define indexof
@@ -454,7 +468,7 @@
   (lambda (var val environment)
     (if (exists-in-list? var (variables (car environment)))
         (myerror "error: variable is being re-declared:" var)
-        (cons (add-to-frame var (box val)) (cdr environment)))))
+        (cons (add-to-frame var val (car environment)) (cdr environment)))))
 
 ; Adds a new function/closure binding pair into the environment.  Gives an error if the function already exists in this frame.
 (define insert-function
@@ -473,7 +487,7 @@
 ; Add a new variable/value pair to the frame.
 (define add-to-frame
   (lambda (var val frame)
-    (list (cons var (variables frame)) (cons (box (scheme->language val)) (store frame)))))
+    (list (cons var (variables frame)) (cons (scheme->language val) (store frame)))))
 
 ; Changes the binding of a variable in the environment to a new value
 (define update-existing
@@ -491,12 +505,8 @@
 (define update-in-frame-store
   (lambda (var val varlist vallist)
     (cond
-      ((null? varlist) '())
-      ((eq? var (car varlist)))
-            (cons (cons (car varlist) (begin (set-box! (cdr (car vallist)) (scheme->language val)) (cdr (car vallist))))
-                  (cdr vallist))
-            (cons (car vallist)
-                  (update-in-frame-store var val (cdr varlist) (cdr vallist))))))
+      ((eq? var (car varlist)) (cons (scheme->language val)) (cdr vallist))
+      (else (cons (car vallist) (update-in-frame-store var val (cdr varlist) (cdr vallist)))))))
 
 ; Returns the list of variables from a frame
 (define variables
