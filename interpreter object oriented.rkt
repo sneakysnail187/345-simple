@@ -109,7 +109,7 @@
     (let* ((class-name (class-name class-statement))  ; Assume class-name extracts the name of the class from the statement
            (class-body (class-closure-body class-statement))  ; Assume class-closure-body extracts the body
            (class-env (extend-environment-with-class environment class-name)))  ; Create a new environment for the class
-      (interpret-statement-list class-body class-env)  ; Interpret the class body in this new environment
+      (inter(interpret-statement-list class-body class-env)  ; Interpret the class body in this new environment
       (let ((complete-class-info (assemble-class-info class-env)))  ; Gather all info from the class environment
         (insert class-name complete-class-info environment)))))  ; Insert the complete class info into the outer environment
 
@@ -125,8 +125,10 @@
 
 ; Check if method is an entry
 (define method-definition?
-  (lambda (entry)
-    (eq? (entry-type entry) 'method)))
+  (lambda (class-env method-name params body)
+    (let ((full-params (cons 'this params)))  ; Prepend 'this' to the parameter list
+      (let ((method-closure (make-closure body class-env full-params)))
+        (env-define class-env method-name method-closure)))))
 
 ; Determine if an entry is a property
 (define property-definition?
@@ -180,6 +182,47 @@
   (lambda (function-body environment parameters class-info)
     (list function-body environment parameters class-info)))
 
+(define process-dot-expression
+  (lambda (lhs method-name args environment)
+    ((let ((instance (evaluate-left-hand-side lhs environment)))
+       (let ((class (instance-get-class instance)))
+         (let ((method-closure (hash-ref (class-get-methods class) method-name)))
+           (if method-closure
+               (invoke-method method-closure instance args)
+               (error "Method not found: " method-name))))))))
+
+(define lookup-method-in-class
+  (lambda (instance method-name)
+    (let ((class-methods (instance-class-methods instance)))
+      (assoc method-name class-methods))))
+
+(define instance-class-methods
+  (lambda (instance)
+    (let ((class-object (instance-get-class instance)))  ; A function to get the class object from an instance
+      (class-get-methods class-object))))  ; A function to get methods from the class object
+
+;; Retrieve the methods hash table from the class object
+(define (class-get-methods class)(hash-ref class 'methods))
+
+(define instance-get-class
+  (lambda (instance)
+    (if (hash-has-key? instance 'class)
+        (hash-ref instance 'class)
+        (error "Instance does not have class information."))))
+
+(define define-method
+  (lambda (class-env method-name params body class-info)
+    (let ((method-closure (make-closure body class-env params class-info)))
+      (env-define class-env method-name method-closure))))
+
+(define invoke-method
+  (lambda (method-closure instance args)
+    ((let ((method-body (car method-closure))
+        (method-environment (cadr method-closure))
+        (method-parameters (caddr method-closure))
+        (method-class (cadddr method-closure)))  ; Class info as fourth element
+    (let ((compile-time-type method-class))  ; Assuming there's a way to set or use this compile-time type
+      (apply method-body (cons instance args) method-environment))))))
 
 ; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
 ; and a way to create the function environment from the current one
@@ -217,14 +260,13 @@
 
 (define env-define
   (lambda (environment key value)
-  (let ((frame (first environment)))  ; Assuming the first element is the current frame
-    (if (assoc key frame)  ; Check if the key already exists in the frame
-        (update environment key value)  ; Update existing binding
-        (cons (cons key value) frame)))))  ; Add new binding if not present
+    (let ((frame (first environment)))  ; Assuming the first element is the current frame
+      (if (assoc key frame)  ; Check if the key already exists in the frame
+          (update environment key value)  ; Update existing binding
+          (cons (cons key value) frame)))))  ; Add new binding if not present
 
 (define inside-class-context?
   (lambda (environment)
- 
     (assoc 'class-context environment)))
 
 (define current-class-info
@@ -252,7 +294,19 @@
                                 (lambda (v env) (throw v (pop-frame env)))
                                 (lambda (env) (next (pop-frame env)))))))
 
+;Function for left-hand of dot operation
+(define evaluate-left-hand-side
+  (lambda (lhs environment)
+    (if (symbol? lhs)
+        (env-lookup lhs environment)
+        (eval-expression lhs environment))))
 
+;Lookup for environments
+(define env-lookup
+  (lambda (var environment)
+    (cond ((null? environment) (error "Variable not found: " var))
+          ((eq? (caar environment) var) (cdar environment))
+          (else (env-lookup var (cdr environment))))))
 
 ; Helper function for lookup on functions 
 ;(define lookup-function
