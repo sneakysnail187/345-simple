@@ -41,14 +41,14 @@
     (lambda (statement-list environment class-name return break continue throw)
         (if (null? statement-list)
             (evaluate-main-class class-name environment return break continue throw)
-            (interpret-statement-list (rest-of-statement statement-list) (interpret-statement (starting-statement statement-list) environment return break continue throw) class-name return break continue throw)
+            (interpret-statement-list (remaining-lines statement-list) (interpret-statement (first-line statement-list) environment return break continue throw) class-name return break continue throw)
         )
     )
 )
 
 ; Abstraction for interpret-statement-list
-(define rest-of-statement cdr)
-(define starting-statement car)
+(define remaining-lines cdr)
+(define first-line car)
 
 ; interprets singular statements
 (define interpret-statement
@@ -190,7 +190,7 @@
     (lambda (statement-list environment return break continue throw)
         (if (null? statement-list)
             environment
-            (interpret-block-statement-list (rest-of-statement statement-list) (interpret-statement (starting-statement statement-list) environment return break continue throw) return break continue throw)
+            (interpret-block-statement-list (remaining-lines statement-list) (interpret-statement (first-line statement-list) environment return break continue throw) return break continue throw)
         )
     )
 )
@@ -235,7 +235,7 @@
     (lambda (statement-list environment return break continue throw)
         (if (null? statement-list)
             environment
-            (interpret-throw-catch-statement-list (rest-of-statement statement-list) (interpret-statement (starting-statement statement-list) environment return break continue throw) return break continue throw)
+            (interpret-throw-catch-statement-list (remaining-lines statement-list) (interpret-statement (first-line statement-list) environment return break continue throw) return break continue throw)
         )
     )
 )
@@ -291,7 +291,7 @@
         (cond
             [(not (exists? class-name environment)) (myerror "Undefined class")]
             [else (interpret-statement-list 
-                        (function-statement-list (find-function-in-closure (cadr (lookup class-name environment)) 'main))
+                        (function-statement-list (lookup-function-in-closure (cadr (lookup class-name environment)) 'main))
                         (make-layer-from-instance-fields  (cadr (lookup class-name environment)) (push-frame environment) return break continue throw)
                         class-name return break continue throw
                     )]
@@ -305,7 +305,7 @@
             [(null? statement-list) environment]
             [else (if (list? (call/cc
                                 (lambda (break-return)
-                                    (interpret-statement (starting-statement statement-list) environment break-return break continue throw))))
+                                    (interpret-statement (first-line statement-list) environment break-return break continue throw))))
                         (interpret-funcall-result-environment (cdr statement-list) (call/cc
                                                                                         (lambda (break-return)
                                                                                             (interpret-statement (car statement-list) environment break-return break continue throw)
@@ -318,15 +318,12 @@
     )
 )
 
-(define find-function-in-closure
-    (lambda (class-closure fun-name)
-        (cond
-            [(null? class-closure) (myerror "Function does not exist")]
-            [(eq? fun-name (cadar class-closure)) (cddar class-closure)]
-            [else (find-function-in-closure (cdr class-closure) fun-name)]
-        )
-    )
-)
+(define lookup-function-in-closure  
+  (lambda (closure fname)
+    (cond
+      ((null? closure) (myerror "Function ~a not found in class closure" fname)) ;add abstraction
+      ((eq? fname (cadar closure)) (cddar closure))
+      (else (lookup-function-in-closure (cdr closure) fname)))))
 
 (define make-layer-from-instance-fields
     (lambda (class-closure environment return break continue throw)
@@ -601,6 +598,11 @@
       ((null? l) #f)
       ((eq? var (car l)) #t)
       (else (exists-in-list? var (cdr l))))))
+
+; remove first and last element of a list
+(define remove-first-and-last
+  (lambda (l)
+    (cdr(reverse(cdr(reverse l))))))
 
 ; create a new empty environment
 (define newenvironment
