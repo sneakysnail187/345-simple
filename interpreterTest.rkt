@@ -318,18 +318,13 @@
     )
 )
 
-(define lookup-function-in-closure  
-  (lambda (closure fname)
-    (cond
-      ((null? closure) (myerror "Function ~a not found in class closure" fname)) ;add abstraction
-      ((eq? fname (cadar closure)) (cddar closure))
-      (else (lookup-function-in-closure (cdr closure) fname)))))
-
 (define make-layer-from-instance-fields
     (lambda (class-closure environment return break continue throw)
         (cond
             [(null? class-closure) environment]
-            [(list? (car class-closure)) (make-layer-from-instance-fields (cdr class-closure) (interpret-statement (car class-closure) environment return break continue throw) return break continue throw)]
+            [(list? (car class-closure)) (make-layer-from-instance-fields (cdr class-closure)
+                                                                          (interpret-statement (car class-closure) environment return break continue throw)
+                                                                          return break continue throw)]
         )
     )
 )
@@ -439,6 +434,105 @@
     )
 )
 
+(define extend-environment-with-class
+  (lambda (environment class-name)
+    (cons (cons 'class-context class-name) environment)))
+
+(define assemble-class-info
+  (lambda (class-env)
+    (let ((class-info (filter (lambda (entry) (or (method-definition? entry) (property-definition? entry)))
+                              class-env)))
+      (list->hash-table class-info))))
+
+; Check if method is an entry
+(define method-definition?
+  (lambda (class-env method-name params body)
+    (let ((full-params (cons 'this params)))  ; Prepend 'this' to the parameter list
+      (let ((method-closure (make-closure body class-env full-params)))
+        (env-define class-env method-name method-closure)))))
+
+; Determine if an entry is a property
+(define property-definition?
+  (lambda (entry)
+    (eq? (entry-type entry) 'property)))
+
+(define entry-type
+  (lambda (entry)
+    (if (and (pair? entry) (list? (cdr entry)))
+        (car (cdr entry))  ; The first item in the list is the type tag
+        'unknown)))  ; Default case if no type info is found
+
+;; Convert a list to a hash-table, assuming each element of the list is a pair (key value)
+(define list->hash-table
+  (lambda (lst)
+    (let ((ht (make-hash)))
+      (for-each (lambda (item)
+                  (hash-set! ht (car item) (cdr item)))
+                lst)
+      ht)))
+
+
+; Make-closure function to include class information
+(define make-closure
+  (lambda (function-body environment parameters class-info)
+    (list function-body environment parameters class-info)))
+
+(define process-dot-expression
+  (lambda (lhs method-name args environment)
+    ((let ((instance (evaluate-left-hand-side lhs environment)))
+       (let ((class (instance-get-class instance)))
+         (let ((method-closure (hash-ref (class-get-methods class) method-name)))
+           (if method-closure
+               (invoke-method method-closure instance args)
+               (error "Method not found: " method-name))))))))
+
+(define lookup-method-in-class
+  (lambda (instance method-name)
+    (let ((class-methods (instance-class-methods instance)))
+      (assoc method-name class-methods))))
+
+(define instance-class-methods
+  (lambda (instance)
+    (let ((class-object (instance-get-class instance)))  ; A function to get the class object from an instance
+      (class-get-methods class-object))))  ; A function to get methods from the class object
+
+;; Retrieve the methods hash table from the class object
+(define (class-get-methods class)(hash-ref class 'methods))
+
+(define instance-get-class
+  (lambda (instance)
+    (if (hash-has-key? instance 'class)
+        (hash-ref instance 'class)
+        (error "Instance does not have class information."))))
+
+(define define-method
+  (lambda (class-env method-name params body class-info)
+    (let ((method-closure (make-closure body class-env params class-info)))
+      (env-define class-env method-name method-closure))))
+
+;; Retrieve the methods hash table from the class object
+
+(define invoke-method
+  (lambda (method-closure instance args)
+    ((let ((method-body (car method-closure))
+        (method-environment (cadr method-closure))
+        (method-parameters (caddr method-closure))
+        (method-class (cadddr method-closure)))  ; Class info as fourth element
+    (let ((compile-time-type method-class))  ; Assuming there's a way to set or use this compile-time type
+      (apply method-body (cons instance args) method-environment))))))
+
+(define env-define
+  (lambda (environment key value)
+    (let ((frame (first environment)))  ; Assuming the first element is the current frame
+      (if (assoc key frame)  ; Check if the key already exists in the frame
+          (update environment key value)  ; Update existing binding
+          (cons (cons key value) frame)))))  ; Add new binding if not present
+
+(define evaluate-left-hand-side
+  (lambda (lhs environment)
+    (if (symbol? lhs)
+        (lookup-env lhs environment)
+        (eval-expression lhs environment))))
 (define eval-expression
     (lambda (expr environment throw)
         (cond
@@ -465,7 +559,6 @@
 (define dot-instance-name cadr)
 (define dot-funcall caddr)
 
-; Complete the evaluation of the binary operator by evaluating the second operand and performing the operation.
 ; Complete the evaluation of the binary operator by evaluating the second operand and performing the operation.
 (define eval-binary-op2
   (lambda (expr op1value environment throw)
@@ -553,6 +646,20 @@
     (cond
       ((not (exists-in-list? var (variables frame))) (myerror (format "error: undefined variable ~a" var)))
       (else (language->scheme (get-value (indexof var (variables frame)) (store frame)))))))
+
+(define lookup-function-in-closure  
+  (lambda (closure fname)
+    (cond
+      ((null? closure) (myerror "Function ~a not found in class closure" fname)) ;add abstraction
+      ((eq? fname (cadar closure)) (cddar closure))
+      (else (lookup-function-in-closure (cdr closure) fname)))))
+
+;Lookup for environments
+(define lookup-env
+  (lambda (var environment)
+    (cond ((null? environment) (error "Variable not found: " var))
+          ((eq? (caar environment) var) (cdar environment))
+          (else (lookup-env var (cdr environment))))))
 
 ; Get the value stored at a given index in the list
 (define get-value
