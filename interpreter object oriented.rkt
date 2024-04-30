@@ -89,12 +89,12 @@
 (define interpret-block
   (lambda (statement environment return break continue throw next)
     (pop-frame (interpret-block-list (cdr statement)
-                                         (push-frame environment)
-                                         return
-                                         (lambda (env) (break (pop-frame env)))
-                                         (lambda (env) (continue (pop-frame env)))
-                                         (lambda (v env) (throw v (pop-frame env)))
-                                         (lambda (env) (next (pop-frame env)))))))
+                                     (push-frame environment)
+                                     return
+                                     (lambda (env) (break (pop-frame env)))
+                                     (lambda (env) (continue (pop-frame env)))
+                                     (lambda (v env) (throw v (pop-frame env)))
+                                     (lambda (env) (next (pop-frame env)))))))
 
 ;Helper function for interpreting block staatements
 (define interpret-block-list
@@ -105,10 +105,49 @@
 
 ; Interprets a class, adding it to the current environment
 (define interpret-class
-  (lambda (closure environment)
-    (cond
-      ((null? closure) (myerror "No closure provided"))
-      (else (insert (class-name closure) (class-closure-body closure) environment)))))
+  (lambda (class-statement environment)
+    (let* ((class-name (class-name class-statement))  ; Assume class-name extracts the name of the class from the statement
+           (class-body (class-closure-body class-statement))  ; Assume class-closure-body extracts the body
+           (class-env (extend-environment-with-class environment class-name)))  ; Create a new environment for the class
+      (interpret-statement-list class-body class-env)  ; Interpret the class body in this new environment
+      (let ((complete-class-info (assemble-class-info class-env)))  ; Gather all info from the class environment
+        (insert class-name complete-class-info environment)))))  ; Insert the complete class info into the outer environment
+
+(define extend-environment-with-class
+  (lambda (environment class-name)
+    (cons (cons 'class-context class-name) environment)))
+
+(define assemble-class-info
+  (lambda (class-env)
+    (let ((class-info (filter (lambda (entry) (or (method-definition? entry) (property-definition? entry)))
+                              class-env)))
+      (list->hash-table class-info))))
+
+; Check if method is an entry
+(define method-definition?
+  (lambda (entry)
+    (eq? (entry-type entry) 'method)))
+
+; Determine if an entry is a property
+(define property-definition?
+  (lambda (entry)
+    (eq? (entry-type entry) 'property)))
+
+(define entry-type
+  (lambda (entry)
+    (if (and (pair? entry) (list? (cdr entry)))
+        (car (cdr entry))  ; The first item in the list is the type tag
+        'unknown)))  ; Default case if no type info is found
+
+;; Convert a list to a hash-table, assuming each element of the list is a pair (key value)
+(define list->hash-table
+  (lambda (lst)
+    (let ((ht (make-hash)))
+      (for-each (lambda (item)
+                  (hash-set! ht (car item) (cdr item)))
+                lst)
+      ht)))
+
 
 (define class-name car)
 (define class-closure-body car)
@@ -137,8 +176,9 @@
 
 
 ; Make-closure function to include class information
-(define (make-closure function-body environment parameters class-info)
-  (list function-body environment parameters class-info))
+(define make-closure
+  (lambda (function-body environment parameters class-info)
+    (list function-body environment parameters class-info)))
 
 
 ; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
@@ -168,10 +208,31 @@
 ; Interprets a function definition. ; still figuring out the function to create the function environment
 
 (define interpret-function
-  (lambda (statement environment next) ;time to test
-    (if (exists-declare-body? statement)
-        (next (insert-function (get-declare-name statement) (get-declare-params statement) (get-declare-body statement) environment))
-        (next (insert-function (get-declare-name statement) 'novalue 'novalue environment)))))
+  (lambda (statement environment next)
+    (let ((name (get-declare-name statement))
+          (params (get-declare-params statement))
+          (body (get-declare-body statement))
+          (class-info (if (inside-class-context? environment) (current-class-info environment) 'no-class)))
+      (next (env-define environment name (make-closure body environment params class-info))))))
+
+(define env-define
+  (lambda (environment key value)
+  (let ((frame (first environment)))  ; Assuming the first element is the current frame
+    (if (assoc key frame)  ; Check if the key already exists in the frame
+        (update environment key value)  ; Update existing binding
+        (cons (cons key value) frame)))))  ; Add new binding if not present
+
+(define inside-class-context?
+  (lambda (environment)
+ 
+    (assoc 'class-context environment)))
+
+(define current-class-info
+  (lambda (environment)
+    (let ((class-context (inside-class-context? environment)))
+      (if class-context
+          (cdr class-context)
+          (error "Not currently inside a class context")))))
 
 ; ***WIP***
 ; ***please review this as Im not sure if this is the correct structure***
@@ -191,25 +252,23 @@
                                 (lambda (v env) (throw v (pop-frame env)))
                                 (lambda (env) (next (pop-frame env)))))))
 
-; Define a closure with function body, environment, parameters, and class information
-(define (make-closure function-body environment parameters class-info)
-  (list function-body environment parameters class-info))
+
 
 ; Helper function for lookup on functions 
 ;(define lookup-function
- ; (lambda (name environment)
-  ;  (let ((body (lookup-function-in-env name environment)))
-   ;   (if (eq? 'novalue body)
-    ;      (myerror "error: function without a body:" name)
-     ;     body))))
+; (lambda (name environment)
+;  (let ((body (lookup-function-in-env name environment)))
+;   (if (eq? 'novalue body)
+;      (myerror "error: function without a body:" name)
+;     body))))
 
 ; Return the body bound to a function in the environment
 ;(define lookup-function-in-env
- ; (lambda (name environment)
-  ;  (cond
-   ;   ((null? environment) (myerror "error: undefined function" name))
-    ;  ((exists-in-list? name (variables (topframe environment))) (lookup-function-in-frame name environment))
-     ; (else (lookup-function-in-env name (cdr environment))))))
+; (lambda (name environment)
+;  (cond
+;   ((null? environment) (myerror "error: undefined function" name))
+;  ((exists-in-list? name (variables (topframe environment))) (lookup-function-in-frame name environment))
+; (else (lookup-function-in-env name (cdr environment))))))
 
 ; Return found function body from provided class closure
 (define lookup-function-in-closure  
@@ -234,14 +293,14 @@
       ((null? catch-statement) (lambda (ex env) (interpret-block finally-block env return break continue throw (lambda (env2) (throw ex env2))))) 
       ((not (eq? 'catch (statement-type catch-statement))) (myerror "Incorrect catch statement"))
       (else (lambda (ex env)
-                  (interpret-statement-list 
-                       (get-body catch-statement) 
-                       (insert (catch-var catch-statement) ex (push-frame env))
-                       return 
-                       (lambda (env2) (break (pop-frame env2))) 
-                       (lambda (env2) (continue (pop-frame env2))) 
-                       (lambda (v env2) (throw v (pop-frame env2))) 
-                       (lambda (env2) (interpret-block finally-block (pop-frame env2) return break continue throw next))))))))
+              (interpret-statement-list 
+               (get-body catch-statement) 
+               (insert (catch-var catch-statement) ex (push-frame env))
+               return 
+               (lambda (env2) (break (pop-frame env2))) 
+               (lambda (env2) (continue (pop-frame env2))) 
+               (lambda (v env2) (throw v (pop-frame env2))) 
+               (lambda (env2) (interpret-block finally-block (pop-frame env2) return break continue throw next))))))))
 
 ; To interpret a try block, we must adjust  the return, break, continue continuations to interpret the finally block if any of them are used.
 ;  We must create a new throw continuation and then interpret the try block with the new continuations followed by the finally block with the old continuations
@@ -446,14 +505,14 @@
 
 ; Return the body bound to a function in the frame
 ;(define lookup-function-in-frame
- ; (lambda (name frame)
-  ;  (cond
-   ;   ((null? frame) (myerror (format "error: undefined function ~a" name)))
-    ;  ((eq? name (caar frame)) 
-     ;  (if (box? (caadr frame)) 
-      ;     (unbox (caadr frame))
-       ;    (myerror (format "error: variable ~a found but its value is not boxed" name))))
-      ;(else (lookup-function-in-frame name (cdr frame))))))
+; (lambda (name frame)
+;  (cond
+;   ((null? frame) (myerror (format "error: undefined function ~a" name)))
+;  ((eq? name (caar frame)) 
+;  (if (box? (caadr frame)) 
+;     (unbox (caadr frame))
+;    (myerror (format "error: variable ~a found but its value is not boxed" name))))
+;(else (lookup-function-in-frame name (cdr frame))))))
 
 ; Get the location of a name in a list of names - don't need with box implementation
 (define indexof
