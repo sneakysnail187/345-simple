@@ -65,8 +65,28 @@
 
 ; Updates the environment to add a new binding for a variable
 (define interpret-assign
-  (lambda (statement environment next)
-    (next (update (get-assign-lhs statement) (eval-expression (get-assign-rhs statement) environment) environment))))
+  (lambda (statement environment)
+    (let ((var-name (get-assign-lhs statement))  ; Get left-hand side of assignment
+          (value (eval-expression (get-assign-rhs statement) environment)))  ; Evaluate right-hand side
+      (if (string-contains? var-name ".")
+          ;; Dot notation indicates an assignment to an instance field.
+          (let* ((parts (split-string var-name "."))
+                 (instance-name (first parts))
+                 (property-name (second parts))
+                 (instance (lookup instance-name environment)))  ; Find the instance in the environment
+            (if instance
+                (update-instance-field instance property-name value)  ; Update the field on the instance
+                (error "Instance not found: " instance-name)))
+          ;; Regular variable assignment.
+          (let ((local-value (env-lookup var-name environment)))
+            (if local-value
+                (update environment var-name value)  ; Update existing local variable
+                ;; If variable not found locally, try as non-static field of 'this'
+                (let ((this-instance (env-lookup 'this environment)))
+                  (if this-instance
+                      (update-instance-field this-instance var-name value)  ; Update field on 'this'
+                      (error "Variable not found in local or as a field: " var-name)))))))))
+
 
 ; We need to check if there is an else condition.  Otherwise, we evaluate the expression and do the right thing.
 (define interpret-if
@@ -564,13 +584,22 @@
 (define lookup
   (lambda (var environment)
     (if (string-contains? var ".")
-      (let* ((parts (split-string var "."))
-             (instance-name (first parts))
-             (property-name (second parts))
-             (instance (eval-expression instance-name environment)))
-        (lookup-instance-field instance property-name))
-      ;; Regular variable lookup
-      (env-lookup var environment))))
+        ;; Handle dot expressions for accessing properties or methods on instances.
+        (let* ((parts (split-string var "."))
+               (instance-name (first parts))
+               (property-name (second parts))
+               (instance (eval-expression instance-name environment)))
+          (lookup-instance-field instance property-name))
+        ;; Regular variable lookup when there's no dot in the variable name.
+        (let ((local-value (env-lookup var environment)))
+          (if local-value
+              local-value
+              ;; If not found locally, attempt to look up the variable as a non-static field of 'this', if 'this' exists in the environment.
+              (let ((this-instance (env-lookup 'this environment)))
+                (if this-instance
+                    (lookup-instance-field this-instance var)
+                    (error "Variable not found: " var))))))))
+
 
 ;; Checks if there's a string
 (define (string-contains? str substring) ((not (null? (regexp-match (regexp-quote substring) str)))))
