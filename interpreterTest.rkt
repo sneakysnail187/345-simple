@@ -708,7 +708,7 @@
 (define lookup-in-frame
   (lambda (var frame)
     (cond
-      ((nor (exists-in-list? var (variables frame))(null? frame)) (myerror (format "error: undefined variable ~a" var)))
+      ((not (exists-in-list? var (variables frame))) (myerror (format "error: undefined variable ~a" var)))
       (else (language->scheme (get-value (indexof var (variables frame)) (store frame)))))))
 
 (define lookup-function-in-closure  
