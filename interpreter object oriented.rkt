@@ -136,6 +136,9 @@
       ((list? (car closure)) (make-state-from-instance (cdr closure) (interpret-statement (car closure) environment return break continue throw))))))
 
 
+; Make-closure function to include class information
+(define (make-closure function-body environment parameters class-info)
+  (list function-body environment parameters class-info))
 
 
 ; On finding a function add it to the outer layer as a binding pair of a function name and a list containing the formal parameter list, the function body,
@@ -175,18 +178,22 @@
 ; Interprets a function call.  The break, continue, throw and "next statement" continuations must be adjusted to pop the environment (not 100% on that for this one)
 (define interpret-function-call
   (lambda (statement environment return break continue throw next)
-    (letrec
-      [
-        (closure (get-function-environment environment (function-param statement)))
-        (closure-body (lookup (function-name statement) environment))
-      ]
-      (interpret-statement-list (cadr closure-body)
-                                        closure
-                                        (lambda (v) v)
-                                        (lambda (s) (myerror "error: break used outside a loop"))
-                                        (lambda (s) (myerror "error: continue used outside a loop"))
-                                        (lambda (v env) (throw v (pop-frame env)))
-                                        (lambda (env) (next (pop-frame env)))))))
+    (let* ((func-name (function-name statement))
+           (closure (lookup func-name environment))
+           (closure-body (first closure))
+           (closure-env (second closure))
+           (closure-params (third closure))
+           (closure-class-info (fourth closure)))  ; Accessing the new fourth element
+      (interpret-statement-list (cadr closure-body) closure-env
+                                (lambda (v) v)
+                                (lambda (s) (myerror "error: break used outside a loop"))
+                                (lambda (s) (myerror "error: continue used outside a loop"))
+                                (lambda (v env) (throw v (pop-frame env)))
+                                (lambda (env) (next (pop-frame env)))))))
+
+; Define a closure with function body, environment, parameters, and class information
+(define (make-closure function-body environment parameters class-info)
+  (list function-body environment parameters class-info))
 
 ; Helper function for lookup on functions 
 ;(define lookup-function
