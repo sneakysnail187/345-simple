@@ -541,7 +541,7 @@
 (define evaluate-left-hand-side
   (lambda (lhs environment)
     (if (symbol? lhs)
-        (lookup-env lhs environment)
+        (lookup-in-env lhs environment)
         (eval-expression lhs environment))))
 
 ;; Adds field to closure
@@ -708,7 +708,7 @@
 (define lookup-in-frame
   (lambda (var frame)
     (cond
-      ((not (exists-in-list? var (variables frame))) (myerror (format "error: undefined variable ~a" var)))
+      ((nor (exists-in-list? var (variables frame))(null? frame)) (myerror (format "error: undefined variable ~a" var)))
       (else (language->scheme (get-value (indexof var (variables frame)) (store frame)))))))
 
 (define lookup-function-in-closure  
@@ -717,13 +717,6 @@
       ((null? closure) (myerror "Function ~a not found in class closure" fname)) ;add abstraction
       ((eq? fname (cadar closure)) (cddar closure))
       (else (lookup-function-in-closure (cdr closure) fname)))))
-
-;Lookup for environments
-(define lookup-env
-  (lambda (var environment)
-    (cond ((null? environment) (error "Variable not found: " var))
-          ((eq? (caar environment) var) (cdar environment))
-          (else (lookup-env var (cdr environment))))))
 
 ; Get the value stored at a given index in the list
 (define get-value
