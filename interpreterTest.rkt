@@ -124,17 +124,27 @@
 (define get-declare-var operand1)
 
 (define interpret-assign
-    (lambda (statement environment throw)
-        (cond
-            [(list? (get-assign-lhs statement)) (cond
-                                                    [(eq? (assign-dot-prefix (dot-block)) 'this) (update (car (var-to-update statement)) (eval-expression (value-to-update statement) environment throw) (pop-frame environment))]
-                                                    [(eq? (assign-dot-prefix (dot-block)) 'super) 1]
-                                                    [else (myerror "undefined operator")]                                       
-            )]
-            [else (update (get-assign-lhs statement) (eval-expression (get-assign-rhs statement) environment throw) environment)]
-        )
-    )
-)
+    (lambda (statement environment)
+    (let ((var-name (get-assign-lhs statement))  ; Get left-hand side of assignment
+          (value (eval-expression (get-assign-rhs statement) environment)))  ; Evaluate right-hand side
+      (if (string-contains? var-name ".")
+          ;; Dot notation indicates an assignment to an instance field.
+          (let* ((parts (split-string var-name "."))
+                 (instance-name (first parts))
+                 (property-name (second parts))
+                 (instance (lookup instance-name environment)))  ; Find the instance in the environment
+            (if instance
+                (update-instance-field instance property-name value)  ; Update the field on the instance
+                (error "Instance not found: " instance-name)))
+          ;; Regular variable assignment.
+          (let ((local-value (lookup-in-env var-name environment)))
+            (if local-value
+                (update environment var-name value)  ; Update existing local variable
+                ;; If variable not found locally, try as non-static field of 'this'
+                (let ((this-instance (lookup-in-env 'this environment)))
+                  (if this-instance
+                      (update-instance-field this-instance var-name value)  ; Update field on 'this'
+                      (error "Variable not found in local or as a field: " var-name)))))))))
 
 (define assign-dot-prefix cadr)
 (define dot-block cadr)
@@ -533,6 +543,41 @@
     (if (symbol? lhs)
         (lookup-env lhs environment)
         (eval-expression lhs environment))))
+
+;; Adds field to closure
+(define declare-class-field
+  (lambda (class-closure field-name)
+    (hash-set! class-closure 'fields (cons field-name (hash-ref class-closure 'fields '())))
+    class-closure))
+
+;; Initializes fields in instance closure
+(define initialize-instance-fields
+  (lambda (instance-closure class-closure)
+    (let ((field-names (hash-ref class-closure 'fields '())))
+      (for-each (lambda (field-name)
+                  (hash-set! instance-closure field-name 'undefined))
+                field-names)
+      instance-closure)))
+
+;; Checks for field
+(define lookup-instance-field
+  (lambda (instance-closure field-name)
+    (if (hash-has-key? instance-closure field-name)
+        (hash-ref instance-closure field-name)
+        (error "Field does not exist: " field-name))))
+
+;Updates the field instance
+(define update-instance-field
+  (lambda (instance-closure field-name new-value)
+    (if (hash-has-key? instance-closure field-name)
+        (hash-set! instance-closure field-name new-value)
+        (error "Field does not exist: " field-name))
+    instance-closure))
+
+
+
+
+
 (define eval-expression
     (lambda (expr environment throw)
         (cond
@@ -622,7 +667,26 @@
 ; Looks up a value in the environment.  If the value is a boolean, it converts our languages boolean type to a Scheme boolean type
 (define lookup
   (lambda (var environment)
-    (lookup-variable var environment)))
+    (if (string-contains? var ".")
+      (let* ((parts (split-string var "."))
+               (instance-name (first parts))
+               (property-name (second parts))
+               (instance (eval-expression instance-name environment)))
+          (lookup-instance-field instance property-name))
+        ;; Regular variable lookup when there's no dot in the variable name.
+        (let ((local-value (lookup-in-env var environment)))
+          (if local-value
+              local-value
+              ;; If not found locally, attempt to look up the variable as a non-static field of 'this', if 'this' exists in the environment.
+              (let ((this-instance (lookup-in-env 'this environment)))
+                (if this-instance
+                    (lookup-instance-field this-instance var)
+                    (error "Variable not found: " var))))))))
+
+;; Checks if there's a string
+(define (string-contains? str substring) ((not (null? (regexp-match (regexp-quote substring) str)))))
+;; Splits the string
+(define (split-string str delimiter)(string-split str delimiter))
   
 ; A helper function that does the lookup.  Returns an error if the variable does not have a legal value
 (define lookup-variable
