@@ -109,9 +109,9 @@
     (let* ((class-name (class-name class-statement))  ; Assume class-name extracts the name of the class from the statement
            (class-body (class-closure-body class-statement))  ; Assume class-closure-body extracts the body
            (class-env (extend-environment-with-class environment class-name)))  ; Create a new environment for the class
-      (inter(interpret-statement-list class-body class-env)  ; Interpret the class body in this new environment
+      (interpret(interpret-statement-list class-body class-env)  ; Interpret the class body in this new environment
       (let ((complete-class-info (assemble-class-info class-env)))  ; Gather all info from the class environment
-        (insert class-name complete-class-info environment)))))  ; Insert the complete class info into the outer environment
+        (insert class-name complete-class-info environment))))))  ; Insert the complete class info into the outer environment
 
 (define extend-environment-with-class
   (lambda (environment class-name)
@@ -153,6 +153,36 @@
 
 (define class-name car)
 (define class-closure-body car)
+
+;; Adds field to closure
+(define declare-class-field
+  (lambda (class-closure field-name)
+    (hash-set! class-closure 'fields (cons field-name (hash-ref class-closure 'fields '())))
+    class-closure))
+
+;; Initializes fields in instance closure
+(define initialize-instance-fields
+  (lambda (instance-closure class-closure)
+    (let ((field-names (hash-ref class-closure 'fields '())))
+      (for-each (lambda (field-name)
+                  (hash-set! instance-closure field-name 'undefined))
+                field-names)
+      instance-closure)))
+
+;; Checks for field
+(define lookup-instance-field
+  (lambda (instance-closure field-name)
+    (if (hash-has-key? instance-closure field-name)
+        (hash-ref instance-closure field-name)
+        (error "Field does not exist: " field-name))))
+
+;Updates the field instance
+(define update-instance-field
+  (lambda (instance-closure field-name new-value)
+    (if (hash-has-key? instance-closure field-name)
+        (hash-set! instance-closure field-name new-value)
+        (error "Field does not exist: " field-name))
+    instance-closure))
 
 ; Interprets a class type object and adds it to the environment
 (define interpret-new-class-object
@@ -388,6 +418,7 @@
       ((eq? expr 'true) #t)
       ((eq? expr 'false) #f)
       ((not (list? expr)) (lookup expr environment))
+      ((symbol? expr) (lookup expr environment))
       (else (eval-operator expr environment)))))
 
 ; Evaluate a binary (or unary) operator.  Although this is not dealing with side effects, I have the routine evaluate the left operand first and then
@@ -532,7 +563,20 @@
 ; Looks up a value in the environment.  If the value is a boolean, it converts our languages boolean type to a Scheme boolean type
 (define lookup
   (lambda (var environment)
-    (lookup-variable var environment)))
+    (if (string-contains? var ".")
+      (let* ((parts (split-string var "."))
+             (instance-name (first parts))
+             (property-name (second parts))
+             (instance (eval-expression instance-name environment)))
+        (lookup-instance-field instance property-name))
+      ;; Regular variable lookup
+      (env-lookup var environment))))
+
+;; Checks if there's a string
+(define (string-contains? str substring) ((not (null? (regexp-match (regexp-quote substring) str)))))
+;; Splits the string
+(define (split-string str delimiter)(string-split str delimiter))
+
   
 ; A helper function that does the lookup.  Returns an error if the variable does not have a legal value
 (define lookup-variable
