@@ -1,6 +1,23 @@
 #lang racket
 (require "classParser.rkt")
 
+(define operator car)
+(define operand1 cadr)
+(define operand2 caddr)
+(define operand3 cadddr)
+
+(define exists-operand2?
+    (lambda (statement)
+        (not (null? (cddr statement)))
+    )
+)
+
+(define exists-operand3?
+    (lambda (statement)
+        (not (null? (cdddr statement)))
+    )
+)
+
 (define interpret
     (lambda (file class-name)
         (call/cc
@@ -48,7 +65,7 @@
             [(eq? 'throw (statement-type statement)) (interpret-throw statement environment throw)]
             [(eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw)]
             [(eq? 'function (statement-type statement)) (interpret-function (function-block statement) environment return break continue throw)]
-            [(eq? 'static-function) (statement-type statement) (interpret-static (static-function-block statement) environment return break continue throw)]
+            [(eq? 'static-function (statement-type statement)) (interpret-static (static-function-block statement) environment return break continue throw)]
             [(and (eq? 'funcall (statement-type statement)) (list? (function-name (funcall-block statement)))) (update 
                                                                                                                     (instance-name (funcall-block statement)) 
                                                                                                                     (list (car (interpret-funcall-result-environment 
@@ -475,10 +492,7 @@
 
 
 ;__________________________________HELPER FUNCTIONS_______________________________________
-(define operator car)
-(define operand1 cadr)
-(define operand2 caddr)
-(define operand3 cadddr)
+
 
 ; helper methods so that I can reuse the interpret-block method on the try and finally blocks
 (define make-try-block
@@ -498,18 +512,6 @@
     (if (and (number? val1) (number? val2))
         (= val1 val2)
         (eq? val1 val2))))
-
-(define exists-operand2?
-    (lambda (statement)
-        (not (null? (cddr statement)))
-    )
-)
-
-(define exists-operand3?
-    (lambda (statement)
-        (not (null? (cdddr statement)))
-    )
-)
 
 (define exists-declare-value? exists-operand2?)
 
